@@ -1,1 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin - São Raimundo</title>
 
+<style>
+body{
+  font-family: Arial;
+  background:#111827;
+  color:white;
+  text-align:center;
+  padding:20px;
+}
+input,button{
+  padding:10px;
+  margin:5px;
+  border-radius:8px;
+  border:none;
+}
+button{
+  background:red;
+  color:white;
+}
+.card{
+  background:#1f2937;
+  padding:15px;
+  margin:10px;
+  border-radius:10px;
+}
+</style>
+</head>
+<body>
+
+<h1>ADMIN - São Raimundo</h1>
+
+<div id="login">
+  <input type="password" id="senha" placeholder="Senha do administrador">
+  <button onclick="entrar()">Entrar</button>
+</div>
+
+<div id="painel" style="display:none;">
+
+<h2>Criar Nova Cotação</h2>
+<input type="text" id="nomeCotacao" placeholder="Nome da cotação">
+<button onclick="criarCotacao()">Criar</button>
+
+<h2>Lista de Cotações</h2>
+<div id="lista"></div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, updateDoc } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCeJtoTDcNmA8aMLtRrHR-CoZUQkbe5TYk",
+  authDomain: "cot-online-sao-raimundo-sup.firebaseapp.com",
+  projectId: "cot-online-sao-raimundo-sup",
+  storageBucket: "cot-online-sao-raimundo-sup.firebasestorage.app",
+  messagingSenderId: "57432026650",
+  appId: "1:57432026650:web:8a47dd3f22b40bd6e02ba3"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+window.entrar = function(){
+  const senha = document.getElementById("senha").value;
+  if(senha === "1234"){ // ALTERE AQUI SUA SENHA
+    document.getElementById("login").style.display="none";
+    document.getElementById("painel").style.display="block";
+  } else {
+    alert("Senha incorreta");
+  }
+}
+
+window.criarCotacao = async function(){
+  const nome = document.getElementById("nomeCotacao").value;
+  if(!nome) return alert("Digite o nome");
+
+  await addDoc(collection(db,"cotacoes"),{
+    nome:nome,
+    ativa:true,
+    data:new Date().toLocaleDateString()
+  });
+
+  document.getElementById("nomeCotacao").value="";
+}
+
+const lista = document.getElementById("lista");
+
+onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
+  lista.innerHTML="";
+  snapshot.forEach((docSnap)=>{
+    const data = docSnap.data();
+    lista.innerHTML+=`
+      <div class="card">
+        <b>${data.nome}</b><br>
+        Status: ${data.ativa ? "Ativa" : "Desativada"}<br>
+        <button onclick="toggle('${docSnap.id}',${data.ativa})">Ativar/Desativar</button>
+        <button onclick="excluir('${docSnap.id}')">Excluir</button>
+      </div>
+    `;
+  });
+});
+
+window.toggle = async function(id,status){
+  await updateDoc(doc(db,"cotacoes",id),{
+    ativa:!status
+  });
+}
+
+window.excluir = async function(id){
+  await deleteDoc(doc(db,"cotacoes",id));
+}
+</script>
+
+</body>
+</html>
