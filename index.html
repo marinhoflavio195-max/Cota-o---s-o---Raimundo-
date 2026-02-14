@@ -1,1 +1,166 @@
 
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>São Raimundo Supermercado - Cotação</title>
+
+<style>
+body{
+  font-family: Arial;
+  margin:0;
+  background:#f4f4f4;
+}
+
+header{
+  background:#c40000;
+  color:white;
+  padding:15px;
+  text-align:center;
+  font-size:20px;
+  font-weight:bold;
+}
+
+.container{
+  padding:15px;
+}
+
+button{
+  background:#c40000;
+  color:white;
+  border:none;
+  padding:10px;
+  margin:5px 0;
+  width:100%;
+  border-radius:5px;
+  font-size:16px;
+}
+
+input{
+  width:100%;
+  padding:8px;
+  margin:5px 0;
+  border-radius:5px;
+  border:1px solid #ccc;
+}
+
+.card{
+  background:white;
+  padding:10px;
+  margin:10px 0;
+  border-radius:5px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+São Raimundo Supermercado  
+Sistema de Cotação
+</header>
+
+<div class="container">
+
+<h3>Painel Administrador</h3>
+
+<input type="text" id="produtoNome" placeholder="Nome do Produto">
+<input type="text" id="marcaNome" placeholder="Marca">
+<button onclick="adicionarProduto()">Adicionar Produto</button>
+
+<hr>
+
+<h3>Lista para Cotação</h3>
+<div id="listaProdutos"></div>
+
+<hr>
+
+<h3>Tela do Vendedor</h3>
+<div id="listaVendedor"></div>
+
+<button onclick="enviarWhatsApp()">Finalizar e Enviar no WhatsApp</button>
+
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCeJtoTDcNmA8aMLtRrHR-CoZUQkbe5TYk",
+  authDomain: "cot-online-sao-raimundo-sup.firebaseapp.com",
+  projectId: "cot-online-sao-raimundo-sup",
+  storageBucket: "cot-online-sao-raimundo-sup.firebasestorage.app",
+  messagingSenderId: "57432026650",
+  appId: "1:57432026650:web:8a47dd3f22b40bd6e02ba3"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+window.adicionarProduto = async function(){
+  const nome = document.getElementById("produtoNome").value;
+  const marca = document.getElementById("marcaNome").value;
+
+  if(nome === ""){
+    alert("Digite o nome do produto");
+    return;
+  }
+
+  await addDoc(collection(db,"cotacao"),{
+    nome:nome,
+    marca:marca
+  });
+
+  alert("Produto adicionado!");
+  location.reload();
+}
+
+async function carregarProdutos(){
+  const querySnapshot = await getDocs(collection(db,"cotacao"));
+
+  let lista = document.getElementById("listaProdutos");
+  let vendedor = document.getElementById("listaVendedor");
+
+  querySnapshot.forEach((doc) => {
+    const data = doc.data();
+
+    lista.innerHTML += `
+      <div class="card">
+        ${data.nome} - ${data.marca}
+      </div>
+    `;
+
+    vendedor.innerHTML += `
+      <div class="card">
+        ${data.nome} - ${data.marca}
+        <input type="number" placeholder="Digite o preço" class="preco">
+      </div>
+    `;
+  });
+}
+
+window.enviarWhatsApp = function(){
+  let mensagem = "Cotação São Raimundo Supermercado:\n\n";
+  let cards = document.querySelectorAll("#listaVendedor .card");
+
+  cards.forEach(card=>{
+    let texto = card.innerText;
+    let preco = card.querySelector("input").value;
+    mensagem += texto + " - R$ " + preco + "\n";
+  });
+
+  let numero = "5599988592997";
+  let url = "https://wa.me/" + numero + "?text=" + encodeURIComponent(mensagem);
+
+  window.open(url, "_blank");
+}
+
+carregarProdutos();
+
+</script>
+
+</body>
+</html>
