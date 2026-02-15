@@ -1,60 +1,98 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin - São Raimundo</title>
+<title>Admin - São Raimundo Supermercado</title>
 
 <style>
 body{
-  font-family: Arial;
-  background:#111827;
+  margin:0;
+  font-family:Arial, Helvetica, sans-serif;
+  background:#8B0000;
   color:white;
   text-align:center;
+}
+
+header{
+  background:#B22222;
+  padding:20px;
+  font-size:22px;
+  font-weight:bold;
+}
+
+.container{
   padding:20px;
 }
+
 input,button{
   padding:10px;
   margin:5px;
   border-radius:8px;
   border:none;
 }
+
 button{
-  background:red;
+  background:#ff0000;
   color:white;
+  cursor:pointer;
 }
+
+button:hover{
+  background:#cc0000;
+}
+
 .card{
-  background:#1f2937;
+  background:white;
+  color:black;
   padding:15px;
-  margin:10px;
+  margin:10px auto;
   border-radius:10px;
+  max-width:400px;
 }
 </style>
 </head>
+
 <body>
 
-<h1>ADMIN - São Raimundo</h1>
+<header>
+São Raimundo Supermercado - ADMIN
+</header>
+
+<div class="container">
 
 <div id="login">
-  <input type="password" id="senha" placeholder="Senha do administrador">
+  <h2>Login Administrador</h2>
+  <input type="password" id="senha" placeholder="Digite a senha">
+  <br>
   <button onclick="entrar()">Entrar</button>
 </div>
 
 <div id="painel" style="display:none;">
 
 <h2>Criar Nova Cotação</h2>
-<input type="text" id="nomeCotacao" placeholder="Nome da cotação">
-<button onclick="criarCotacao()">Criar</button>
+<input type="text" id="nomeCotacao" placeholder="Nome da cotação (Ex: Cotação Frios)">
+<br>
+<button onclick="criarCotacao()">Criar Cotação</button>
 
 <h2>Lista de Cotações</h2>
 <div id="lista"></div>
 
 </div>
 
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, updateDoc } 
-from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot, 
+  updateDoc 
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCeJtoTDcNmA8aMLtRrHR-CoZUQkbe5TYk",
@@ -68,19 +106,21 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// LOGIN SIMPLES
 window.entrar = function(){
   const senha = document.getElementById("senha").value;
-  if(senha === "1234"){ // ALTERE AQUI SUA SENHA
+  if(senha === "1234"){ // ALTERE SUA SENHA AQUI
     document.getElementById("login").style.display="none";
     document.getElementById("painel").style.display="block";
   } else {
-    alert("Senha incorreta");
+    alert("Senha incorreta!");
   }
 }
 
+// CRIAR COTAÇÃO
 window.criarCotacao = async function(){
   const nome = document.getElementById("nomeCotacao").value;
-  if(!nome) return alert("Digite o nome");
+  if(!nome) return alert("Digite o nome da cotação");
 
   await addDoc(collection(db,"cotacoes"),{
     nome:nome,
@@ -91,6 +131,7 @@ window.criarCotacao = async function(){
   document.getElementById("nomeCotacao").value="";
 }
 
+// LISTAR COTAÇÕES EM TEMPO REAL
 const lista = document.getElementById("lista");
 
 onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
@@ -100,7 +141,7 @@ onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
     lista.innerHTML+=`
       <div class="card">
         <b>${data.nome}</b><br>
-        Status: ${data.ativa ? "Ativa" : "Desativada"}<br>
+        Status: ${data.ativa ? "Ativa" : "Desativada"}<br><br>
         <button onclick="toggle('${docSnap.id}',${data.ativa})">Ativar/Desativar</button>
         <button onclick="excluir('${docSnap.id}')">Excluir</button>
       </div>
@@ -108,12 +149,14 @@ onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
   });
 });
 
+// ATIVAR/DESATIVAR
 window.toggle = async function(id,status){
   await updateDoc(doc(db,"cotacoes",id),{
     ativa:!status
   });
 }
 
+// EXCLUIR
 window.excluir = async function(id){
   await deleteDoc(doc(db,"cotacoes",id));
 }
