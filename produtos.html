@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Produtos - São Raimundo</title>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial, Helvetica, sans-serif;
+  background:#8B0000;
+  color:white;
+  text-align:center;
+}
+
+header{
+  background:#B22222;
+  padding:20px;
+  font-size:20px;
+  font-weight:bold;
+}
+
+.container{
+  padding:20px;
+}
+
+input, select, button{
+  padding:10px;
+  margin:5px;
+  border-radius:8px;
+  border:none;
+}
+
+button{
+  background:#ff0000;
+  color:white;
+  cursor:pointer;
+}
+
+button:hover{
+  background:#cc0000;
+}
+
+.card{
+  background:white;
+  color:black;
+  padding:15px;
+  margin:10px auto;
+  border-radius:10px;
+  max-width:400px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+São Raimundo Supermercado - Produtos da Cotação
+</header>
+
+<div class="container">
+
+<h2 id="titulo"></h2>
+
+<input type="text" id="nomeProduto" placeholder="Nome do produto">
+<br>
+
+<select id="unidade">
+  <option value="kg">Kg</option>
+  <option value="pacote">Pacote</option>
+  <option value="caixa">Caixa</option>
+  <option value="unidade">Unidade</option>
+</select>
+<br>
+
+<button onclick="adicionarProduto()">Adicionar Produto</button>
+
+<h3>Lista de Produtos</h3>
+<div id="listaProdutos"></div>
+
+<br>
+<button onclick="voltar()">Voltar ao Admin</button>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot 
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCeJtoTDcNmA8aMLtRrHR-CoZUQkbe5TYk",
+  authDomain: "cot-online-sao-raimundo-sup.firebaseapp.com",
+  projectId: "cot-online-sao-raimundo-sup",
+  storageBucket: "cot-online-sao-raimundo-sup.firebasestorage.app",
+  messagingSenderId: "57432026650",
+  appId: "1:57432026650:web:8a47dd3f22b40bd6e02ba3"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const cotacaoId = localStorage.getItem("cotacaoId");
+const cotacaoNome = localStorage.getItem("cotacaoNome");
+
+document.getElementById("titulo").innerText = "Cotação: " + cotacaoNome;
+
+const lista = document.getElementById("listaProdutos");
+
+window.adicionarProduto = async function(){
+  const nome = document.getElementById("nomeProduto").value;
+  const unidade = document.getElementById("unidade").value;
+
+  if(!nome) return alert("Digite o nome do produto");
+
+  await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+    nome:nome,
+    unidade:unidade
+  });
+
+  document.getElementById("nomeProduto").value="";
+}
+
+onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), (snapshot)=>{
+  lista.innerHTML="";
+  snapshot.forEach((docSnap)=>{
+    const data = docSnap.data();
+    lista.innerHTML+=`
+      <div class="card">
+        <b>${data.nome}</b><br>
+        Unidade: ${data.unidade}<br><br>
+        <button onclick="excluirProduto('${docSnap.id}')">Excluir</button>
+      </div>
+    `;
+  });
+});
+
+window.excluirProduto = async function(id){
+  await deleteDoc(doc(db,"cotacoes",cotacaoId,"produtos",id));
+}
+
+window.voltar = function(){
+  window.location.href="admin.html";
+}
+</script>
+
+</body>
+</html>
