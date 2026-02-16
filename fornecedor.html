@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fornecedor - São Raimundo</title>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial;
+  background:#8B0000;
+  color:white;
+  text-align:center;
+}
+
+header{
+  background:#B22222;
+  padding:20px;
+  font-size:20px;
+  font-weight:bold;
+}
+
+.container{
+  padding:20px;
+}
+
+input, button{
+  padding:10px;
+  margin:5px;
+  border-radius:8px;
+  border:none;
+}
+
+input{
+  width:120px;
+}
+
+button{
+  background:#ff0000;
+  color:white;
+  cursor:pointer;
+}
+
+button:hover{
+  background:#cc0000;
+}
+
+.card{
+  background:white;
+  color:black;
+  padding:15px;
+  margin:10px auto;
+  border-radius:10px;
+  max-width:400px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+São Raimundo Supermercado - Cotação Fornecedor
+</header>
+
+<div class="container">
+
+<h3>Seu Nome:</h3>
+<input type="text" id="fornecedor" placeholder="Nome da empresa">
+
+<h3>Cotações Ativas</h3>
+<div id="cotacoes"></div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { 
+  getFirestore, 
+  collection, 
+  onSnapshot, 
+  doc, 
+  getDocs,
+  addDoc
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCeJtoTDcNmA8aMLtRrHR-CoZUQkbe5TYk",
+  authDomain: "cot-online-sao-raimundo-sup.firebaseapp.com",
+  projectId: "cot-online-sao-raimundo-sup",
+  storageBucket: "cot-online-sao-raimundo-sup.firebasestorage.app",
+  messagingSenderId: "57432026650",
+  appId: "1:57432026650:web:8a47dd3f22b40bd6e02ba3"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const container = document.getElementById("cotacoes");
+
+onSnapshot(collection(db,"cotacoes"), async (snapshot)=>{
+  container.innerHTML="";
+  
+  snapshot.forEach(async (docSnap)=>{
+    const data = docSnap.data();
+    if(data.ativa){
+      
+      let html = `<div class="card"><h4>${data.nome}</h4>`;
+      
+      const produtosSnap = await getDocs(collection(db,"cotacoes",docSnap.id,"produtos"));
+      
+      produtosSnap.forEach((prod)=>{
+        const p = prod.data();
+        html += `
+          ${p.nome} (${p.unidade})<br>
+          <input type="number" step="0.01" placeholder="Preço" id="${docSnap.id}_${prod.id}">
+          <br><br>
+        `;
+      });
+
+      html += `<button onclick="finalizar('${docSnap.id}','${data.nome}')">Finalizar Cotação</button></div>`;
+      
+      container.innerHTML += html;
+    }
+  });
+});
+
+window.finalizar = async function(cotacaoId,cotacaoNome){
+
+  const fornecedor = document.getElementById("fornecedor").value;
+  if(!fornecedor) return alert("Digite o nome do fornecedor");
+
+  const produtosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
+
+  let lista = [];
+  let mensagem = `Cotação: ${cotacaoNome}\nFornecedor: ${fornecedor}\n\n`;
+
+  produtosSnap.forEach((prod)=>{
+    const p = prod.data();
+    const valor = document.getElementById(cotacaoId+"_"+prod.id).value || "0";
+    
+    lista.push({
+      nome:p.nome,
+      unidade:p.unidade,
+      valor:valor
+    });
+
+    mensagem += `${p.nome} - R$ ${valor}\n`;
+  });
+
+  await addDoc(collection(db,"respostas"),{
+    cotacaoId:cotacaoId,
+    cotacaoNome:cotacaoNome,
+    fornecedor:fornecedor,
+    produtos:lista,
+    data:new Date().toLocaleDateString()
+  });
+
+  const numero = "5599988592997";
+  const url = "https://wa.me/"+numero+"?text="+encodeURIComponent(mensagem);
+  
+  window.open(url,"_blank");
+}
+</script>
+
+</body>
+</html>
