@@ -71,7 +71,7 @@ São Raimundo Supermercado - ADMIN
 <div id="painel" style="display:none;">
 
 <h2>Criar Nova Cotação</h2>
-<input type="text" id="nomeCotacao" placeholder="Nome da cotação (Ex: Cotação Frios)">
+<input type="text" id="nomeCotacao" placeholder="Nome da cotação">
 <br>
 <button onclick="criarCotacao()">Criar Cotação</button>
 
@@ -106,10 +106,10 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// LOGIN SIMPLES
+// LOGIN
 window.entrar = function(){
   const senha = document.getElementById("senha").value;
-  if(senha === "1234"){ // ALTERE SUA SENHA AQUI
+  if(senha === "1234"){
     document.getElementById("login").style.display="none";
     document.getElementById("painel").style.display="block";
   } else {
@@ -120,7 +120,7 @@ window.entrar = function(){
 // CRIAR COTAÇÃO
 window.criarCotacao = async function(){
   const nome = document.getElementById("nomeCotacao").value;
-  if(!nome) return alert("Digite o nome da cotação");
+  if(!nome) return alert("Digite o nome");
 
   await addDoc(collection(db,"cotacoes"),{
     nome:nome,
@@ -131,7 +131,7 @@ window.criarCotacao = async function(){
   document.getElementById("nomeCotacao").value="";
 }
 
-// LISTAR COTAÇÕES EM TEMPO REAL
+// LISTAR
 const lista = document.getElementById("lista");
 
 onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
@@ -142,6 +142,7 @@ onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
       <div class="card">
         <b>${data.nome}</b><br>
         Status: ${data.ativa ? "Ativa" : "Desativada"}<br><br>
+        <button onclick="abrirProdutos('${docSnap.id}','${data.nome}')">Produtos</button>
         <button onclick="toggle('${docSnap.id}',${data.ativa})">Ativar/Desativar</button>
         <button onclick="excluir('${docSnap.id}')">Excluir</button>
       </div>
@@ -159,6 +160,13 @@ window.toggle = async function(id,status){
 // EXCLUIR
 window.excluir = async function(id){
   await deleteDoc(doc(db,"cotacoes",id));
+}
+
+// ABRIR PRODUTOS
+window.abrirProdutos = function(id,nome){
+  localStorage.setItem("cotacaoId",id);
+  localStorage.setItem("cotacaoNome",nome);
+  window.location.href="produtos.html";
 }
 </script>
 
