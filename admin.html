@@ -9,14 +9,14 @@
 body{
   margin:0;
   font-family:Arial, Helvetica, sans-serif;
-  background:#f4f4f4;
+  background:#8B0000;
+  color:white;
+  text-align:center;
 }
 
 header{
   background:#B22222;
-  color:white;
   padding:20px;
-  text-align:center;
   font-size:22px;
   font-weight:bold;
 }
@@ -25,33 +25,38 @@ header{
   padding:20px;
 }
 
-.card{
-  background:white;
-  padding:15px;
-  margin-bottom:15px;
-  border-radius:10px;
-  box-shadow:0 0 10px rgba(0,0,0,0.1);
+input,button{
+  padding:10px;
+  margin:5px;
+  border-radius:8px;
+  border:none;
 }
 
 button{
   background:#ff0000;
   color:white;
-  padding:8px 15px;
-  border:none;
-  border-radius:8px;
   cursor:pointer;
-  margin:5px 0;
 }
 
 button:hover{
   background:#cc0000;
 }
 
+.card{
+  background:white;
+  color:black;
+  padding:15px;
+  margin:10px auto;
+  border-radius:10px;
+  max-width:450px;
+}
+
 .resultado{
   background:#fff;
-  margin-top:10px;
+  color:#000;
   padding:10px;
-  border-radius:8px;
+  margin-top:10px;
+  border-radius:10px;
   font-size:14px;
 }
 </style>
@@ -61,27 +66,42 @@ button:hover{
 
 <header>
 São Raimundo Supermercado - ADMIN
-<button onclick="logout()" style="float:right;">Sair</button>
 </header>
 
 <div class="container">
-<h2>Cotações</h2>
+
+<div id="login">
+  <h2>Login Administrador</h2>
+  <input type="password" id="senha" placeholder="Digite a senha">
+  <br>
+  <button onclick="entrar()">Entrar</button>
+</div>
+
+<div id="painel" style="display:none;">
+
+<h2>Criar Nova Cotação</h2>
+<input type="text" id="nomeCotacao" placeholder="Nome da cotação">
+<br>
+<button onclick="criarCotacao()">Criar Cotação</button>
+
+<h2>Lista de Cotações</h2>
 <div id="lista"></div>
+
+</div>
+
 </div>
 
 <script type="module">
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { 
-  getAuth,
-  onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
 import { 
   getFirestore, 
   collection, 
-  getDocs
+  addDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot, 
+  updateDoc,
+  getDocs 
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -94,100 +114,116 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 const db = getFirestore(app);
 
-const lista = document.getElementById("lista");
-
-
-// 🔒 PROTEÇÃO DE ACESSO
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    if (user.email !== "admin@saoraymundo.com") {
-      alert("Acesso permitido apenas para administrador.");
-      window.location.href = "fornecedor.html";
-    }
+// LOGIN SIMPLES
+window.entrar = function(){
+  const senha = document.getElementById("senha").value;
+  if(senha === "1234"){
+    document.getElementById("login").style.display="none";
+    document.getElementById("painel").style.display="block";
   } else {
-    window.location.href = "index.html";
+    alert("Senha incorreta!");
   }
-});
-
-
-// 🚪 LOGOUT
-window.logout = function(){
-  signOut(auth).then(() => {
-    window.location.href = "index.html";
-  });
-};
-
-
-// 📋 LISTAR COTAÇÕES + MENOR PREÇO
-async function carregarCotacoes(){
-
-  lista.innerHTML = "";
-
-  const cotacoesSnap = await getDocs(collection(db,"cotacoes"));
-
-  cotacoesSnap.forEach(async (cotDoc) => {
-
-    const cotacaoId = cotDoc.id;
-    const cotData = cotDoc.data();
-
-    let html = `
-      <div class="card">
-        <h3>${cotData.nome}</h3>
-        <button onclick="verMenorPreco('${cotacaoId}')">Ver Menor Preço</button>
-        <div id="resultado-${cotacaoId}" class="resultado"></div>
-      </div>
-    `;
-
-    lista.innerHTML += html;
-
-  });
-
 }
 
+// CRIAR COTAÇÃO
+window.criarCotacao = async function(){
+  const nome = document.getElementById("nomeCotacao").value;
+  if(!nome) return alert("Digite o nome");
+
+  await addDoc(collection(db,"cotacoes"),{
+    nome:nome,
+    ativa:true,
+    data:new Date().toLocaleDateString()
+  });
+
+  document.getElementById("nomeCotacao").value="";
+}
+
+// LISTAR COTAÇÕES
+const lista = document.getElementById("lista");
+
+onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
+  lista.innerHTML="";
+  snapshot.forEach((docSnap)=>{
+    const data = docSnap.data();
+    lista.innerHTML+=`
+      <div class="card">
+        <b>${data.nome}</b><br>
+        Status: ${data.ativa ? "Ativa" : "Desativada"}<br><br>
+
+        <button onclick="abrirProdutos('${docSnap.id}','${data.nome}')">Produtos</button>
+        <button onclick="verMenorPreco('${docSnap.id}')">Menor Preço</button>
+        <button onclick="toggle('${docSnap.id}',${data.ativa})">Ativar/Desativar</button>
+        <button onclick="excluir('${docSnap.id}')">Excluir</button>
+
+        <div id="resultado-${docSnap.id}" class="resultado"></div>
+      </div>
+    `;
+  });
+});
+
+// ATIVAR/DESATIVAR
+window.toggle = async function(id,status){
+  await updateDoc(doc(db,"cotacoes",id),{
+    ativa:!status
+  });
+}
+
+// EXCLUIR
+window.excluir = async function(id){
+  await deleteDoc(doc(db,"cotacoes",id));
+}
+
+// ABRIR PRODUTOS
+window.abrirProdutos = function(id,nome){
+  localStorage.setItem("cotacaoId",id);
+  localStorage.setItem("cotacaoNome",nome);
+  window.location.href="produtos.html";
+}
+
+// MENOR PREÇO
 window.verMenorPreco = async function(cotacaoId){
 
   const respostasSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"respostas"));
 
   let menores = {};
 
-  respostasSnap.forEach((resDoc)=>{
+  respostasSnap.forEach((docSnap)=>{
 
-    const dados = resDoc.data();
+    const dados = docSnap.data();
     const fornecedor = dados.fornecedor;
     const produtos = dados.produtos;
 
-    for(let nomeProduto in produtos){
+    produtos.forEach(p => {
 
-      let preco = parseFloat(produtos[nomeProduto]);
+      let preco = parseFloat(p.valor);
 
-      if(!menores[nomeProduto] || preco < menores[nomeProduto].preco){
-        menores[nomeProduto] = {
+      if(!menores[p.nome] || preco < menores[p.nome].preco){
+        menores[p.nome] = {
           fornecedor: fornecedor,
           preco: preco
         };
       }
 
-    }
+    });
 
   });
 
-  let resultadoHTML = "<b>🏆 Menores Preços:</b><br><br>";
+  let html = "<b>🏆 Menores Preços:</b><br><br>";
 
   for(let produto in menores){
-    resultadoHTML += `
+    html += `
       ${produto}<br>
-      ✅ ${menores[produto].fornecedor} - R$ ${menores[produto].preco.toFixed(2)}<br><br>
+      ✅ ${menores[produto].fornecedor}
+      - R$ ${menores[produto].preco.toFixed(2)}<br><br>
     `;
   }
 
-  document.getElementById("resultado-"+cotacaoId).innerHTML = resultadoHTML;
+  document.getElementById("resultado-"+cotacaoId).innerHTML = html;
 
 }
-
-carregarCotacoes();
 
 </script>
 
