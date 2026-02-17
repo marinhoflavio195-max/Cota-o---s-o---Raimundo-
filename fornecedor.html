@@ -79,7 +79,6 @@ import {
   getFirestore, 
   collection, 
   onSnapshot, 
-  doc, 
   getDocs,
   addDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -98,67 +97,80 @@ const db = getFirestore(app);
 
 const container = document.getElementById("cotacoes");
 
+// 🔥 LISTAR COTAÇÕES ATIVAS
 onSnapshot(collection(db,"cotacoes"), async (snapshot)=>{
   container.innerHTML="";
   
-  snapshot.forEach(async (docSnap)=>{
+  for (const docSnap of snapshot.docs) {
+
     const data = docSnap.data();
     if(data.ativa){
-      
+
       let html = `<div class="card"><h4>${data.nome}</h4>`;
-      
-      const produtosSnap = await getDocs(collection(db,"cotacoes",docSnap.id,"produtos"));
-      
+
+      const produtosSnap = await getDocs(
+        collection(db,"cotacoes",docSnap.id,"produtos")
+      );
+
       produtosSnap.forEach((prod)=>{
         const p = prod.data();
         html += `
-          ${p.nome} (${p.unidade})<br>
+          <b>${p.nome}</b> (${p.unidade})<br>
           <input type="number" step="0.01" placeholder="Preço" id="${docSnap.id}_${prod.id}">
           <br><br>
         `;
       });
 
-      html += `<button onclick="finalizar('${docSnap.id}','${data.nome}')">Finalizar Cotação</button></div>`;
-      
+      html += `
+        <button onclick="finalizar('${docSnap.id}','${data.nome}')">
+          Finalizar Cotação
+        </button>
+      </div>`;
+
       container.innerHTML += html;
     }
-  });
+  }
 });
 
+
+// 🔥 FUNÇÃO FINALIZAR CORRIGIDA
 window.finalizar = async function(cotacaoId,cotacaoNome){
 
   const fornecedor = document.getElementById("fornecedor").value;
   if(!fornecedor) return alert("Digite o nome do fornecedor");
 
-  const produtosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
+  const produtosSnap = await getDocs(
+    collection(db,"cotacoes",cotacaoId,"produtos")
+  );
 
-  let lista = [];
+  let produtosObjeto = {};
   let mensagem = `Cotação: ${cotacaoNome}\nFornecedor: ${fornecedor}\n\n`;
 
   produtosSnap.forEach((prod)=>{
     const p = prod.data();
-    const valor = document.getElementById(cotacaoId+"_"+prod.id).value || "0";
-    
-    lista.push({
-      nome:p.nome,
-      unidade:p.unidade,
-      valor:valor
-    });
+    const valor = parseFloat(
+      document.getElementById(cotacaoId+"_"+prod.id).value || "0"
+    );
 
+    produtosObjeto[p.nome] = valor;
     mensagem += `${p.nome} - R$ ${valor}\n`;
   });
 
-  await addDoc(collection(db,"respostas"),{
-    cotacaoId:cotacaoId,
-    cotacaoNome:cotacaoNome,
-    fornecedor:fornecedor,
-    produtos:lista,
-    data:new Date().toLocaleDateString()
-  });
+  // ✅ SALVA NO LUGAR CORRETO (DENTRO DA COTAÇÃO)
+  await addDoc(
+    collection(db,"cotacoes",cotacaoId,"respostas"),
+    {
+      fornecedor:fornecedor,
+      produtos:produtosObjeto,
+      data:new Date().toLocaleDateString()
+    }
+  );
 
+  alert("Cotação enviada com sucesso!");
+
+  // 🔥 ENVIA PARA WHATSAPP
   const numero = "5599988592997";
   const url = "https://wa.me/"+numero+"?text="+encodeURIComponent(mensagem);
-  
   window.open(url,"_blank");
 }
 </script>
