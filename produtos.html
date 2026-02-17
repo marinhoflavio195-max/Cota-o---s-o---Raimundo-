@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Produtos - São Raimundo</title>
+<title>Admin - São Raimundo</title>
 
 <style>
 body{
@@ -25,11 +25,15 @@ header{
   padding:20px;
 }
 
-input, select, button{
+input, button{
   padding:10px;
   margin:5px;
   border-radius:8px;
   border:none;
+}
+
+input{
+  width:200px;
 }
 
 button{
@@ -56,31 +60,19 @@ button:hover{
 <body>
 
 <header>
-São Raimundo Supermercado - Produtos da Cotação
+São Raimundo Supermercado - Administração
 </header>
 
 <div class="container">
 
-<h2 id="titulo"></h2>
+<h2>Nova Cotação</h2>
 
-<input type="text" id="nomeProduto" placeholder="Nome do produto">
+<input type="text" id="nomeCotacao" placeholder="Nome da cotação">
 <br>
+<button onclick="criarCotacao()">Criar Cotação</button>
 
-<select id="unidade">
-  <option value="kg">Kg</option>
-  <option value="pacote">Pacote</option>
-  <option value="caixa">Caixa</option>
-  <option value="unidade">Unidade</option>
-</select>
-<br>
-
-<button onclick="adicionarProduto()">Adicionar Produto</button>
-
-<h3>Lista de Produtos</h3>
-<div id="listaProdutos"></div>
-
-<br>
-<button onclick="voltar()">Voltar ao Admin</button>
+<h3>Cotações Cadastradas</h3>
+<div id="listaCotacoes"></div>
 
 </div>
 
@@ -90,15 +82,16 @@ import {
   getFirestore, 
   collection, 
   addDoc, 
-  deleteDoc, 
-  doc, 
+  deleteDoc,
+  doc,
+  updateDoc,
   onSnapshot,
-  query,
-  orderBy
+  orderBy,
+  query
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCeJtoTDcNmA8aMLtRrHR-CoZUQkbe5TYk",
+  apiKey: "SUA_API_AQUI",
   authDomain: "cot-online-sao-raimundo-sup.firebaseapp.com",
   projectId: "cot-online-sao-raimundo-sup",
   storageBucket: "cot-online-sao-raimundo-sup.firebasestorage.app",
@@ -109,79 +102,90 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const cotacaoId = localStorage.getItem("cotacaoId");
-const cotacaoNome = localStorage.getItem("cotacaoNome");
+const lista = document.getElementById("listaCotacoes");
 
-if(!cotacaoId){
-  alert("Nenhuma cotação selecionada.");
-  window.location.href="admin.html";
-}
-
-document.getElementById("titulo").innerText = "Cotação: " + cotacaoNome;
-
-const lista = document.getElementById("listaProdutos");
-
-window.adicionarProduto = async function(){
-  const nome = document.getElementById("nomeProduto").value.trim();
-  const unidade = document.getElementById("unidade").value;
+window.criarCotacao = async function(){
+  const nome = document.getElementById("nomeCotacao").value.trim();
 
   if(!nome){
-    alert("Digite o nome do produto");
+    alert("Digite o nome da cotação");
     return;
   }
 
   try{
-    await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+    await addDoc(collection(db,"cotacoes"),{
       nome:nome,
-      unidade:unidade,
-      criadoEm:new Date()
+      ativa:true,
+      criadaEm:new Date()
     });
 
-    document.getElementById("nomeProduto").value="";
+    document.getElementById("nomeCotacao").value="";
   }catch(e){
-    alert("Erro ao adicionar produto");
+    alert("Erro ao criar cotação");
     console.error(e);
   }
 }
 
-const q = query(
-  collection(db,"cotacoes",cotacaoId,"produtos"),
-  orderBy("criadoEm","asc")
-);
+const q = query(collection(db,"cotacoes"), orderBy("criadaEm","desc"));
 
-onSnapshot(q, (snapshot)=>{
+onSnapshot(q,(snapshot)=>{
   lista.innerHTML="";
 
   if(snapshot.empty){
-    lista.innerHTML="<p>Nenhum produto cadastrado.</p>";
+    lista.innerHTML="<p>Nenhuma cotação criada.</p>";
     return;
   }
 
   snapshot.forEach((docSnap)=>{
     const data = docSnap.data();
+
     lista.innerHTML+=`
       <div class="card">
         <b>${data.nome}</b><br>
-        Unidade: ${data.unidade}<br><br>
-        <button onclick="excluirProduto('${docSnap.id}')">Excluir</button>
+        Status: ${data.ativa ? "🟢 Ativa" : "🔴 Encerrada"}<br><br>
+
+        <button onclick="gerenciarProdutos('${docSnap.id}','${data.nome}')">
+          Produtos
+        </button>
+
+        <button onclick="alterarStatus('${docSnap.id}',${data.ativa})">
+          ${data.ativa ? "Encerrar" : "Reativar"}
+        </button>
+
+        <button onclick="excluirCotacao('${docSnap.id}')">
+          Excluir
+        </button>
       </div>
     `;
   });
 });
 
-window.excluirProduto = async function(id){
-  if(confirm("Deseja realmente excluir este produto?")){
-    try{
-      await deleteDoc(doc(db,"cotacoes",cotacaoId,"produtos",id));
-    }catch(e){
-      alert("Erro ao excluir produto");
-      console.error(e);
-    }
+window.gerenciarProdutos = function(id,nome){
+  localStorage.setItem("cotacaoId",id);
+  localStorage.setItem("cotacaoNome",nome);
+  window.location.href="produtos.html";
+}
+
+window.alterarStatus = async function(id,statusAtual){
+  try{
+    await updateDoc(doc(db,"cotacoes",id),{
+      ativa:!statusAtual
+    });
+  }catch(e){
+    alert("Erro ao alterar status");
+    console.error(e);
   }
 }
 
-window.voltar = function(){
-  window.location.href="admin.html";
+window.excluirCotacao = async function(id){
+  if(confirm("Deseja excluir esta cotação?")){
+    try{
+      await deleteDoc(doc(db,"cotacoes",id));
+    }catch(e){
+      alert("Erro ao excluir");
+      console.error(e);
+    }
+  }
 }
 </script>
 
