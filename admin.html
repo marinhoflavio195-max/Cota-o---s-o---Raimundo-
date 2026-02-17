@@ -107,9 +107,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "SUA_API_KEY",
-  authDomain: "SEU_AUTH_DOMAIN",
+  apiKey: "AIzaSyCeJtoTDcNmA8aMLtRrHR-CoZUQkbe5TYk",
+  authDomain: "cot-online-sao-raimundo-sup.firebaseapp.com",
   projectId: "cot-online-sao-raimundo-sup",
+  storageBucket: "cot-online-sao-raimundo-sup.firebasestorage.app",
+  messagingSenderId: "57432026650",
+  appId: "1:57432026650:web:8a47dd3f22b40bd6e02ba3"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -140,7 +143,7 @@ window.criarCotacao = async function(){
   document.getElementById("nomeCotacao").value="";
 }
 
-// LISTAR
+// LISTAR COTAÇÕES
 const lista = document.getElementById("lista");
 
 onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
@@ -182,7 +185,7 @@ window.abrirProdutos = function(id,nome){
   window.location.href="produtos.html";
 }
 
-// 🔥 MENOR PREÇO + PDF
+// MENOR PREÇO + PDF
 window.verMenorPreco = async function(cotacaoId,cotacaoNome){
 
   const snapshot = await getDocs(collection(db,"respostas"));
@@ -192,7 +195,7 @@ window.verMenorPreco = async function(cotacaoId,cotacaoNome){
   snapshot.forEach(docSnap=>{
     const dados = docSnap.data();
 
-    if(dados.cotacaoId === cotacaoId){
+    if(dados.cotacaoId === cotacaoId && dados.produtos){
 
       dados.produtos.forEach(prod=>{
 
