@@ -92,7 +92,9 @@ import {
   addDoc, 
   deleteDoc, 
   doc, 
-  onSnapshot 
+  onSnapshot,
+  query,
+  orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -110,26 +112,51 @@ const db = getFirestore(app);
 const cotacaoId = localStorage.getItem("cotacaoId");
 const cotacaoNome = localStorage.getItem("cotacaoNome");
 
+if(!cotacaoId){
+  alert("Nenhuma cotação selecionada.");
+  window.location.href="admin.html";
+}
+
 document.getElementById("titulo").innerText = "Cotação: " + cotacaoNome;
 
 const lista = document.getElementById("listaProdutos");
 
 window.adicionarProduto = async function(){
-  const nome = document.getElementById("nomeProduto").value;
+  const nome = document.getElementById("nomeProduto").value.trim();
   const unidade = document.getElementById("unidade").value;
 
-  if(!nome) return alert("Digite o nome do produto");
+  if(!nome){
+    alert("Digite o nome do produto");
+    return;
+  }
 
-  await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
-    nome:nome,
-    unidade:unidade
-  });
+  try{
+    await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+      nome:nome,
+      unidade:unidade,
+      criadoEm:new Date()
+    });
 
-  document.getElementById("nomeProduto").value="";
+    document.getElementById("nomeProduto").value="";
+  }catch(e){
+    alert("Erro ao adicionar produto");
+    console.error(e);
+  }
 }
 
-onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), (snapshot)=>{
+const q = query(
+  collection(db,"cotacoes",cotacaoId,"produtos"),
+  orderBy("criadoEm","asc")
+);
+
+onSnapshot(q, (snapshot)=>{
   lista.innerHTML="";
+
+  if(snapshot.empty){
+    lista.innerHTML="<p>Nenhum produto cadastrado.</p>";
+    return;
+  }
+
   snapshot.forEach((docSnap)=>{
     const data = docSnap.data();
     lista.innerHTML+=`
@@ -143,7 +170,14 @@ onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), (snapshot)=>{
 });
 
 window.excluirProduto = async function(id){
-  await deleteDoc(doc(db,"cotacoes",cotacaoId,"produtos",id));
+  if(confirm("Deseja realmente excluir este produto?")){
+    try{
+      await deleteDoc(doc(db,"cotacoes",cotacaoId,"produtos",id));
+    }catch(e){
+      alert("Erro ao excluir produto");
+      console.error(e);
+    }
+  }
 }
 
 window.voltar = function(){
