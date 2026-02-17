@@ -48,7 +48,15 @@ button:hover{
   padding:15px;
   margin:10px auto;
   border-radius:10px;
-  max-width:400px;
+  max-width:450px;
+}
+.resultado{
+  background:#fff;
+  color:#000;
+  padding:10px;
+  margin-top:10px;
+  border-radius:10px;
+  font-size:14px;
 }
 </style>
 </head>
@@ -91,16 +99,14 @@ import {
   deleteDoc, 
   doc, 
   onSnapshot, 
-  updateDoc 
+  updateDoc,
+  getDocs 
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCeJtoTDcNmA8aMLtRrHR-CoZUQkbe5TYk",
-  authDomain: "cot-online-sao-raimundo-sup.firebaseapp.com",
+  apiKey: "SUA_API",
+  authDomain: "SEU_AUTH",
   projectId: "cot-online-sao-raimundo-sup",
-  storageBucket: "cot-online-sao-raimundo-sup.firebasestorage.app",
-  messagingSenderId: "57432026650",
-  appId: "1:57432026650:web:8a47dd3f22b40bd6e02ba3"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -131,7 +137,7 @@ window.criarCotacao = async function(){
   document.getElementById("nomeCotacao").value="";
 }
 
-// LISTAR
+// LISTAR COTAÇÕES
 const lista = document.getElementById("lista");
 
 onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
@@ -143,8 +149,10 @@ onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
         <b>${data.nome}</b><br>
         Status: ${data.ativa ? "Ativa" : "Desativada"}<br><br>
         <button onclick="abrirProdutos('${docSnap.id}','${data.nome}')">Produtos</button>
+        <button onclick="verMenorPreco('${docSnap.id}')">Menor Preço</button>
         <button onclick="toggle('${docSnap.id}',${data.ativa})">Ativar/Desativar</button>
         <button onclick="excluir('${docSnap.id}')">Excluir</button>
+        <div id="resultado-${docSnap.id}" class="resultado"></div>
       </div>
     `;
   });
@@ -168,6 +176,46 @@ window.abrirProdutos = function(id,nome){
   localStorage.setItem("cotacaoNome",nome);
   window.location.href="produtos.html";
 }
+
+
+// 🔥 SISTEMA AUTOMÁTICO DE MENOR PREÇO
+window.verMenorPreco = async function(cotacaoId){
+
+  const produtosRef = collection(db,"cotacoes",cotacaoId,"respostas");
+  const snapshot = await getDocs(produtosRef);
+
+  let menores = {};
+
+  snapshot.forEach(docSnap=>{
+    const dados = docSnap.data();
+    const fornecedor = dados.fornecedor;
+    const produtos = dados.produtos;
+
+    for(let nomeProduto in produtos){
+      let preco = parseFloat(produtos[nomeProduto]);
+
+      if(!menores[nomeProduto] || preco < menores[nomeProduto].preco){
+        menores[nomeProduto] = {
+          fornecedor: fornecedor,
+          preco: preco
+        };
+      }
+    }
+  });
+
+  let html = "<b>🏆 Menores Preços:</b><br><br>";
+
+  for(let produto in menores){
+    html += `
+      ${produto} <br>
+      ✅ ${menores[produto].fornecedor} 
+      - R$ ${menores[produto].preco.toFixed(2)} <br><br>
+    `;
+  }
+
+  document.getElementById("resultado-"+cotacaoId).innerHTML = html;
+}
+
 </script>
 
 </body>
