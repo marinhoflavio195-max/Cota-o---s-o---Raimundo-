@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin - São Raimundo Supermercado</title>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
 body{
   margin:0;
@@ -105,18 +107,15 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCeJtoTDcNmA8aMLtRrHR-CoZUQkbe5TYk",
-  authDomain: "cot-online-sao-raimundo-sup.firebaseapp.com",
+  apiKey: "SUA_API_KEY",
+  authDomain: "SEU_AUTH_DOMAIN",
   projectId: "cot-online-sao-raimundo-sup",
-  storageBucket: "cot-online-sao-raimundo-sup.firebasestorage.app",
-  messagingSenderId: "57432026650",
-  appId: "1:57432026650:web:8a47dd3f22b40bd6e02ba3"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// LOGIN SIMPLES
+// LOGIN
 window.entrar = function(){
   const senha = document.getElementById("senha").value;
   if(senha === "1234"){
@@ -141,7 +140,7 @@ window.criarCotacao = async function(){
   document.getElementById("nomeCotacao").value="";
 }
 
-// LISTAR COTAÇÕES
+// LISTAR
 const lista = document.getElementById("lista");
 
 onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
@@ -154,7 +153,7 @@ onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
         Status: ${data.ativa ? "Ativa" : "Desativada"}<br><br>
 
         <button onclick="abrirProdutos('${docSnap.id}','${data.nome}')">Produtos</button>
-        <button onclick="verMenorPreco('${docSnap.id}')">Menor Preço</button>
+        <button onclick="verMenorPreco('${docSnap.id}','${data.nome}')">Menor Preço</button>
         <button onclick="toggle('${docSnap.id}',${data.ativa})">Ativar/Desativar</button>
         <button onclick="excluir('${docSnap.id}')">Excluir</button>
 
@@ -183,35 +182,38 @@ window.abrirProdutos = function(id,nome){
   window.location.href="produtos.html";
 }
 
-// MENOR PREÇO
-window.verMenorPreco = async function(cotacaoId){
+// 🔥 MENOR PREÇO + PDF
+window.verMenorPreco = async function(cotacaoId,cotacaoNome){
 
-  const respostasSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"respostas"));
+  const snapshot = await getDocs(collection(db,"respostas"));
 
   let menores = {};
 
-  respostasSnap.forEach((docSnap)=>{
-
+  snapshot.forEach(docSnap=>{
     const dados = docSnap.data();
-    const fornecedor = dados.fornecedor;
-    const produtos = dados.produtos;
 
-    produtos.forEach(p => {
+    if(dados.cotacaoId === cotacaoId){
 
-      let preco = parseFloat(p.valor);
+      dados.produtos.forEach(prod=>{
 
-      if(!menores[p.nome] || preco < menores[p.nome].preco){
-        menores[p.nome] = {
-          fornecedor: fornecedor,
-          preco: preco
-        };
-      }
+        let preco = parseFloat(prod.valor);
 
-    });
+        if(!menores[prod.nome] || preco < menores[prod.nome].preco){
+          menores[prod.nome] = {
+            fornecedor: dados.fornecedor,
+            preco: preco
+          };
+        }
+
+      });
+
+    }
 
   });
 
   let html = "<b>🏆 Menores Preços:</b><br><br>";
+  let textoPDF = "São Raimundo Supermercado\n";
+  textoPDF += "Cotação: " + cotacaoNome + "\n\n";
 
   for(let produto in menores){
     html += `
@@ -219,10 +221,29 @@ window.verMenorPreco = async function(cotacaoId){
       ✅ ${menores[produto].fornecedor}
       - R$ ${menores[produto].preco.toFixed(2)}<br><br>
     `;
+
+    textoPDF += produto + " - "
+      + menores[produto].fornecedor
+      + " - R$ "
+      + menores[produto].preco.toFixed(2)
+      + "\n";
   }
 
-  document.getElementById("resultado-"+cotacaoId).innerHTML = html;
+  html += `<button onclick="gerarPDF(\`${textoPDF}\`)">Gerar PDF</button>`;
 
+  document.getElementById("resultado-"+cotacaoId).innerHTML = html;
+}
+
+// GERAR PDF
+window.gerarPDF = function(texto){
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  const linhas = doc.splitTextToSize(texto, 180);
+  doc.text(linhas, 10, 10);
+
+  doc.save("cotacao-menor-preco.pdf");
 }
 
 </script>
