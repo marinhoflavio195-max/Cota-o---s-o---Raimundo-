@@ -1,27 +1,36 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Teste Firebase</title>
+<style>
+body{
+  font-family:Arial;
+  text-align:center;
+  padding:30px;
+}
+button{
+  padding:15px;
+  font-size:16px;
+}
+#status{
+  margin-top:20px;
+  font-weight:bold;
+}
+</style>
 </head>
-<body style="font-family:Arial; text-align:center; padding:40px;">
+<body>
 
 <h2>Teste de Conexão Firebase</h2>
 
-<input type="text" id="nome" placeholder="Digite algo">
-<button onclick="salvar()">Salvar no Firebase</button>
+<button onclick="testar()">Testar Conexão</button>
 
-<h3>Dados Salvos:</h3>
-<div id="lista"></div>
+<div id="status"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { 
-  getFirestore, 
-  collection, 
-  addDoc,
-  onSnapshot
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, addDoc, collection } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCeJtoTDcNmA8aMLtRrHR-CoZUQkbe5TYk",
@@ -35,26 +44,21 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-window.salvar = async function() {
-  const nome = document.getElementById("nome").value;
-  if(!nome) return alert("Digite algo");
+window.testar = async function(){
+  const status = document.getElementById("status");
+  status.innerHTML = "Testando...";
 
-  await addDoc(collection(db,"teste"),{
-    nome: nome,
-    data: new Date()
-  });
+  try{
+    await addDoc(collection(db,"teste_conexao"),{
+      nome:"Funcionando",
+      data:new Date()
+    });
 
-  alert("Salvo com sucesso!");
+    status.innerHTML = "✅ Firebase está funcionando!";
+  }catch(error){
+    status.innerHTML = "❌ Erro: " + error.message;
+  }
 }
-
-onSnapshot(collection(db,"teste"), (snapshot)=>{
-  const div = document.getElementById("lista");
-  div.innerHTML = "";
-
-  snapshot.forEach((doc)=>{
-    div.innerHTML += "<p>"+doc.data().nome+"</p>";
-  });
-});
 </script>
 
 </body>
