@@ -189,7 +189,6 @@ window.abrirProdutos = function(id,nome){
 window.verMenorPreco = async function(cotacaoId,cotacaoNome){
 
   const snapshot = await getDocs(collection(db,"respostas"));
-
   let menores = {};
 
   snapshot.forEach(docSnap=>{
@@ -198,7 +197,6 @@ window.verMenorPreco = async function(cotacaoId,cotacaoNome){
     if(dados.cotacaoId === cotacaoId && dados.produtos){
 
       dados.produtos.forEach(prod=>{
-
         let preco = parseFloat(prod.valor);
 
         if(!menores[prod.nome] || preco < menores[prod.nome].preco){
@@ -207,11 +205,8 @@ window.verMenorPreco = async function(cotacaoId,cotacaoNome){
             preco: preco
           };
         }
-
       });
-
     }
-
   });
 
   let html = "<b>🏆 Menores Preços:</b><br><br>";
@@ -239,13 +234,10 @@ window.verMenorPreco = async function(cotacaoId,cotacaoNome){
 
 // GERAR PDF
 window.gerarPDF = function(texto){
-
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
-
   const linhas = doc.splitTextToSize(texto, 180);
   doc.text(linhas, 10, 10);
-
   doc.save("cotacao-menor-preco.pdf");
 }
 
