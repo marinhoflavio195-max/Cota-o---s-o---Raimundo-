@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin - São Raimundo Supermercado</title>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
 body{
@@ -27,7 +27,7 @@ header{
   padding:20px;
 }
 
-input,button{
+input,select,button{
   padding:10px;
   margin:5px;
   border-radius:8px;
@@ -50,16 +50,7 @@ button:hover{
   padding:15px;
   margin:10px auto;
   border-radius:10px;
-  max-width:450px;
-}
-
-.resultado{
-  background:#fff;
-  color:#000;
-  padding:10px;
-  margin-top:10px;
-  border-radius:10px;
-  font-size:14px;
+  max-width:500px;
 }
 </style>
 </head>
@@ -83,10 +74,9 @@ São Raimundo Supermercado - ADMIN
 
 <h2>Criar Nova Cotação</h2>
 <input type="text" id="nomeCotacao" placeholder="Nome da cotação">
-<br>
-<button onclick="criarCotacao()">Criar Cotação</button>
+<button onclick="criarCotacao()">Criar</button>
 
-<h2>Lista de Cotações</h2>
+<h2>Cotações</h2>
 <div id="lista"></div>
 
 </div>
@@ -101,9 +91,7 @@ import {
   addDoc, 
   deleteDoc, 
   doc, 
-  onSnapshot, 
-  updateDoc,
-  getDocs 
+  onSnapshot 
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -118,7 +106,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// LOGIN
 window.entrar = function(){
   const senha = document.getElementById("senha").value;
   if(senha === "1234"){
@@ -129,118 +116,45 @@ window.entrar = function(){
   }
 }
 
-// CRIAR COTAÇÃO
 window.criarCotacao = async function(){
   const nome = document.getElementById("nomeCotacao").value;
   if(!nome) return alert("Digite o nome");
 
   await addDoc(collection(db,"cotacoes"),{
     nome:nome,
-    ativa:true,
-    data:new Date().toLocaleDateString()
+    status:"aberta",
+    data:new Date()
   });
 
   document.getElementById("nomeCotacao").value="";
 }
 
-// LISTAR COTAÇÕES
 const lista = document.getElementById("lista");
 
 onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
   lista.innerHTML="";
   snapshot.forEach((docSnap)=>{
     const data = docSnap.data();
+
     lista.innerHTML+=`
       <div class="card">
-        <b>${data.nome}</b><br>
-        Status: ${data.ativa ? "Ativa" : "Desativada"}<br><br>
-
-        <button onclick="abrirProdutos('${docSnap.id}','${data.nome}')">Produtos</button>
-        <button onclick="verMenorPreco('${docSnap.id}','${data.nome}')">Menor Preço</button>
-        <button onclick="toggle('${docSnap.id}',${data.ativa})">Ativar/Desativar</button>
+        <b>${data.nome}</b><br><br>
+        <button onclick="abrir('${docSnap.id}','${data.nome}')">Gerenciar Produtos</button>
         <button onclick="excluir('${docSnap.id}')">Excluir</button>
-
-        <div id="resultado-${docSnap.id}" class="resultado"></div>
       </div>
     `;
   });
 });
 
-// ATIVAR/DESATIVAR
-window.toggle = async function(id,status){
-  await updateDoc(doc(db,"cotacoes",id),{
-    ativa:!status
-  });
-}
-
-// EXCLUIR
 window.excluir = async function(id){
   await deleteDoc(doc(db,"cotacoes",id));
 }
 
-// ABRIR PRODUTOS
-window.abrirProdutos = function(id,nome){
+window.abrir = function(id,nome){
   localStorage.setItem("cotacaoId",id);
   localStorage.setItem("cotacaoNome",nome);
   window.location.href="produtos.html";
 }
-
-// MENOR PREÇO + PDF
-window.verMenorPreco = async function(cotacaoId,cotacaoNome){
-
-  const snapshot = await getDocs(collection(db,"respostas"));
-  let menores = {};
-
-  snapshot.forEach(docSnap=>{
-    const dados = docSnap.data();
-
-    if(dados.cotacaoId === cotacaoId && dados.produtos){
-
-      dados.produtos.forEach(prod=>{
-        let preco = parseFloat(prod.valor);
-
-        if(!menores[prod.nome] || preco < menores[prod.nome].preco){
-          menores[prod.nome] = {
-            fornecedor: dados.fornecedor,
-            preco: preco
-          };
-        }
-      });
-    }
-  });
-
-  let html = "<b>🏆 Menores Preços:</b><br><br>";
-  let textoPDF = "São Raimundo Supermercado\n";
-  textoPDF += "Cotação: " + cotacaoNome + "\n\n";
-
-  for(let produto in menores){
-    html += `
-      ${produto}<br>
-      ✅ ${menores[produto].fornecedor}
-      - R$ ${menores[produto].preco.toFixed(2)}<br><br>
-    `;
-
-    textoPDF += produto + " - "
-      + menores[produto].fornecedor
-      + " - R$ "
-      + menores[produto].preco.toFixed(2)
-      + "\n";
-  }
-
-  html += `<button onclick="gerarPDF(\`${textoPDF}\`)">Gerar PDF</button>`;
-
-  document.getElementById("resultado-"+cotacaoId).innerHTML = html;
-}
-
-// GERAR PDF
-window.gerarPDF = function(texto){
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  const linhas = doc.splitTextToSize(texto, 180);
-  doc.text(linhas, 10, 10);
-  doc.save("cotacao-menor-preco.pdf");
-}
-
 </script>
 
 </body>
