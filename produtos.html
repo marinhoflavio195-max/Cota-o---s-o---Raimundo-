@@ -73,12 +73,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCeJtoTDcNmA8aMLtRrHR-CoZUQkbe5TYk",
-  authDomain: "cot-online-sao-raimundo-sup.firebaseapp.com",
-  projectId: "cot-online-sao-raimundo-sup",
-  storageBucket: "cot-online-sao-raimundo-sup.firebasestorage.app",
-  messagingSenderId: "57432026650",
-  appId: "1:57432026650:web:8a47dd3f22b40bd6e02ba3"
+  apiKey: "AIzaSyA6a_KyBljuDADZYybCKyg2noMhq7i4WPw",
+  authDomain: "cotacao-sao-raimundo-oficial.firebaseapp.com",
+  projectId: "cotacao-sao-raimundo-oficial",
+  storageBucket: "cotacao-sao-raimundo-oficial.firebasestorage.app",
+  messagingSenderId: "999255626219",
+  appId: "1:999255626219:web:653adf6dedde30237fc9ae"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -101,19 +101,16 @@ if(!cotacaoId){
   titulo.innerHTML = "Cotação: " + cotacaoNome;
 
   conteudo.innerHTML = `
-    <h2>Adicionar Produto</h2>
-    <input type="text" id="nomeProduto" placeholder="Nome do produto">
+    <h2>Importar Produtos via Excel</h2>
+    <input type="file" id="arquivoExcel" accept=".xlsx,.xls">
+    <button onclick="importarExcel()">Importar</button>
+
+    <h2>Adicionar Manual</h2>
+    <input type="text" id="nomeProduto" placeholder="Nome">
     <input type="number" id="quantidade" placeholder="Quantidade">
-    <select id="unidade">
-      <option value="UN">UN</option>
-      <option value="KG">KG</option>
-      <option value="CX">CX</option>
-      <option value="FD">FD</option>
-    </select>
-    <input type="text" id="observacao" placeholder="Observação (opcional)">
-    <br>
+    <input type="text" id="unidade" placeholder="Unidade">
+    <input type="text" id="observacao" placeholder="Observação">
     <button onclick="adicionarProduto()">Adicionar</button>
-    <button onclick="exportarExcel()">Exportar Excel</button>
 
     <h2>Lista de Produtos</h2>
     <div id="listaProdutos"></div>
@@ -122,24 +119,19 @@ if(!cotacaoId){
     <button onclick="voltar()">Voltar</button>
   `;
 
-  let produtos = [];
-
   const lista = document.getElementById("listaProdutos");
 
   onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), (snapshot)=>{
     lista.innerHTML="";
-    produtos = [];
-
     snapshot.forEach((docSnap)=>{
       const data = docSnap.data();
-      produtos.push(data);
 
       lista.innerHTML+=`
         <div class="card">
           <b>${data.nome}</b><br>
-          Quantidade: ${data.quantidade} ${data.unidade}<br>
-          ${data.observacao ? "Obs: "+data.observacao+"<br>" : ""}
-          <br>
+          ${data.quantidade} ${data.unidade}<br>
+          ${data.observacao || ""}
+          <br><br>
           <button onclick="excluir('${docSnap.id}')">Excluir</button>
         </div>
       `;
@@ -147,7 +139,6 @@ if(!cotacaoId){
   });
 
   window.adicionarProduto = async function(){
-
     const nome = document.getElementById("nomeProduto").value;
     const quantidade = document.getElementById("quantidade").value;
     const unidade = document.getElementById("unidade").value;
@@ -158,46 +149,52 @@ if(!cotacaoId){
       return;
     }
 
-    try{
-      await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
-        nome,
-        quantidade,
-        unidade,
-        observacao
-      });
+    await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+      nome,
+      quantidade,
+      unidade,
+      observacao
+    });
 
-      document.getElementById("nomeProduto").value="";
-      document.getElementById("quantidade").value="";
-      document.getElementById("observacao").value="";
+    document.getElementById("nomeProduto").value="";
+    document.getElementById("quantidade").value="";
+    document.getElementById("unidade").value="";
+    document.getElementById("observacao").value="";
+  }
 
-    }catch(e){
-      alert("Erro ao salvar: "+e.message);
+  window.importarExcel = function(){
+    const file = document.getElementById("arquivoExcel").files[0];
+
+    if(!file){
+      alert("Selecione um arquivo!");
+      return;
     }
+
+    const reader = new FileReader();
+
+    reader.onload = async function(e){
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, {type: 'array'});
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet);
+
+      for(let item of json){
+        await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+          nome: item.nome,
+          quantidade: item.quantidade,
+          unidade: item.unidade,
+          observacao: item.observacao || ""
+        });
+      }
+
+      alert("Importação concluída!");
+    };
+
+    reader.readAsArrayBuffer(file);
   }
 
   window.excluir = async function(id){
     await deleteDoc(doc(db,"cotacoes",cotacaoId,"produtos",id));
-  }
-
-  window.exportarExcel = function(){
-
-    if(produtos.length === 0){
-      alert("Nenhum produto para exportar!");
-      return;
-    }
-
-    const dados = produtos.map(p => ({
-      Produto: p.nome,
-      Quantidade: p.quantidade,
-      Unidade: p.unidade,
-      Observacao: p.observacao || ""
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(dados);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Cotacao");
-
-    XLSX.writeFile(workbook, "cotacao_"+cotacaoNome+".xlsx");
   }
 }
 
