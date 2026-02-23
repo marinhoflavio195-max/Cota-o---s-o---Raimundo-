@@ -120,13 +120,19 @@ window.criarCotacao = async function(){
   const nome = document.getElementById("nomeCotacao").value;
   if(!nome) return alert("Digite o nome");
 
+  try {
   await addDoc(collection(db,"cotacoes"),{
-    nome:nome,
-    status:"aberta",
-    data:new Date()
+    nome: nome,
+    status: "aberta",
+    dataCriacao: new Date()
   });
 
-  document.getElementById("nomeCotacao").value="";
+  alert("Cotação criada com sucesso!");
+  document.getElementById("nomeCotacao").value = "";
+
+} catch (e) {
+  alert("Erro ao salvar: " + e.message);
+}
 }
 
 const lista = document.getElementById("lista");
