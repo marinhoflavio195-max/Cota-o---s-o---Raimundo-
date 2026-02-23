@@ -84,6 +84,7 @@ São Raimundo Supermercado - ADMIN
 </div>
 
 <script type="module">
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { 
   getFirestore, 
@@ -94,18 +95,23 @@ import {
   onSnapshot 
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
+
+// 🔥 CONFIGURAÇÃO NOVA DO FIREBASE
 const firebaseConfig = {
-  apiKey: "AIzaSyCeJtoTDcNmA8aMLtRrHR-CoZUQkbe5TYk",
-  authDomain: "cot-online-sao-raimundo-sup.firebaseapp.com",
-  projectId: "cot-online-sao-raimundo-sup",
-  storageBucket: "cot-online-sao-raimundo-sup.firebasestorage.app",
-  messagingSenderId: "57432026650",
-  appId: "1:57432026650:web:8a47dd3f22b40bd6e02ba3"
+  apiKey: "AIzaSyA6a_KyBljuDADZYybCKyg2noMhq7i4WPw",
+  authDomain: "cotacao-sao-raimundo-oficial.firebaseapp.com",
+  projectId: "cotacao-sao-raimundo-oficial",
+  storageBucket: "cotacao-sao-raimundo-oficial.firebasestorage.app",
+  messagingSenderId: "999255626219",
+  appId: "1:999255626219:web:653adf6dedde30237fc9ae"
 };
 
+// Inicializa Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+
+// LOGIN SIMPLES
 window.entrar = function(){
   const senha = document.getElementById("senha").value;
   if(senha === "1234"){
@@ -116,25 +122,30 @@ window.entrar = function(){
   }
 }
 
+
+// CRIAR COTAÇÃO
 window.criarCotacao = async function(){
   const nome = document.getElementById("nomeCotacao").value;
   if(!nome) return alert("Digite o nome");
 
   try {
-  await addDoc(collection(db,"cotacoes"),{
-    nome: nome,
-    status: "aberta",
-    dataCriacao: new Date()
-  });
 
-  alert("Cotação criada com sucesso!");
-  document.getElementById("nomeCotacao").value = "";
+    await addDoc(collection(db,"cotacoes"),{
+      nome: nome,
+      status: "aberta",
+      dataCriacao: new Date()
+    });
 
-} catch (e) {
-  alert("Erro ao salvar: " + e.message);
+    alert("Cotação criada com sucesso!");
+    document.getElementById("nomeCotacao").value = "";
+
+  } catch (e) {
+    alert("Erro ao salvar: " + e.message);
+  }
 }
-}
 
+
+// LISTAR COTAÇÕES EM TEMPO REAL
 const lista = document.getElementById("lista");
 
 onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
@@ -152,15 +163,20 @@ onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
   });
 });
 
+
+// EXCLUIR
 window.excluir = async function(id){
   await deleteDoc(doc(db,"cotacoes",id));
 }
 
+
+// ABRIR PRODUTOS
 window.abrir = function(id,nome){
   localStorage.setItem("cotacaoId",id);
   localStorage.setItem("cotacaoNome",nome);
   window.location.href="produtos.html";
 }
+
 </script>
 
 </body>
