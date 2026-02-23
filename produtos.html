@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin - São Raimundo</title>
+<title>Produtos - São Raimundo</title>
 
 <style>
 body{
@@ -17,7 +17,7 @@ body{
 header{
   background:#B22222;
   padding:20px;
-  font-size:20px;
+  font-size:22px;
   font-weight:bold;
 }
 
@@ -25,15 +25,11 @@ header{
   padding:20px;
 }
 
-input, button{
+input,button{
   padding:10px;
   margin:5px;
   border-radius:8px;
   border:none;
-}
-
-input{
-  width:200px;
 }
 
 button{
@@ -52,7 +48,7 @@ button:hover{
   padding:15px;
   margin:10px auto;
   border-radius:10px;
-  max-width:400px;
+  max-width:500px;
 }
 </style>
 </head>
@@ -60,19 +56,22 @@ button:hover{
 <body>
 
 <header>
-São Raimundo Supermercado - Administração
+São Raimundo Supermercado - PRODUTOS
 </header>
 
 <div class="container">
 
-<h2>Nova Cotação</h2>
+<h2 id="tituloCotacao"></h2>
 
-<input type="text" id="nomeCotacao" placeholder="Nome da cotação">
+<h3>Adicionar Produto</h3>
+<input type="text" id="nomeProduto" placeholder="Nome do produto">
+<button onclick="adicionarProduto()">Adicionar</button>
+
+<h3>Lista de Produtos</h3>
+<div id="listaProdutos"></div>
+
 <br>
-<button onclick="criarCotacao()">Criar Cotação</button>
-
-<h3>Cotações Cadastradas</h3>
-<div id="listaCotacoes"></div>
+<button onclick="voltar()">Voltar</button>
 
 </div>
 
@@ -82,110 +81,72 @@ import {
   getFirestore, 
   collection, 
   addDoc, 
-  deleteDoc,
-  doc,
-  updateDoc,
-  onSnapshot,
-  orderBy,
-  query
+  deleteDoc, 
+  doc, 
+  onSnapshot 
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "SUA_API_AQUI",
-  authDomain: "cot-online-sao-raimundo-sup.firebaseapp.com",
-  projectId: "cot-online-sao-raimundo-sup",
-  storageBucket: "cot-online-sao-raimundo-sup.firebasestorage.app",
-  messagingSenderId: "57432026650",
-  appId: "1:57432026650:web:8a47dd3f22b40bd6e02ba3"
+  apiKey: "AIzaSyA6a_KyBljuDADZYybCKyg2noMhq7i4WPw",
+  authDomain: "cotacao-sao-raimundo-oficial.firebaseapp.com",
+  projectId: "cotacao-sao-raimundo-oficial",
+  storageBucket: "cotacao-sao-raimundo-oficial.firebasestorage.app",
+  messagingSenderId: "999255626219",
+  appId: "1:999255626219:web:653adf6dedde30237fc9ae"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const lista = document.getElementById("listaCotacoes");
+const cotacaoId = localStorage.getItem("cotacaoId");
+const cotacaoNome = localStorage.getItem("cotacaoNome");
 
-window.criarCotacao = async function(){
-  const nome = document.getElementById("nomeCotacao").value.trim();
+if (!cotacaoId || !cotacaoNome) {
+  alert("Nenhuma cotação selecionada!");
+  window.location.href = "admin.html";
+}
 
-  if(!nome){
-    alert("Digite o nome da cotação");
-    return;
-  }
+document.getElementById("tituloCotacao").innerText = "Cotação: " + cotacaoNome;
+
+window.adicionarProduto = async function(){
+  const nome = document.getElementById("nomeProduto").value;
+
+  if(!nome) return alert("Digite o nome do produto");
 
   try{
-    await addDoc(collection(db,"cotacoes"),{
-      nome:nome,
-      ativa:true,
-      criadaEm:new Date()
+    await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+      nome: nome,
+      criadoEm: new Date()
     });
 
-    document.getElementById("nomeCotacao").value="";
+    document.getElementById("nomeProduto").value = "";
   }catch(e){
-    alert("Erro ao criar cotação");
-    console.error(e);
+    alert("Erro: " + e.message);
   }
 }
 
-const q = query(collection(db,"cotacoes"), orderBy("criadaEm","desc"));
+const lista = document.getElementById("listaProdutos");
 
-onSnapshot(q,(snapshot)=>{
+onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), (snapshot)=>{
   lista.innerHTML="";
-
-  if(snapshot.empty){
-    lista.innerHTML="<p>Nenhuma cotação criada.</p>";
-    return;
-  }
-
   snapshot.forEach((docSnap)=>{
     const data = docSnap.data();
 
     lista.innerHTML+=`
       <div class="card">
-        <b>${data.nome}</b><br>
-        Status: ${data.ativa ? "🟢 Ativa" : "🔴 Encerrada"}<br><br>
-
-        <button onclick="gerenciarProdutos('${docSnap.id}','${data.nome}')">
-          Produtos
-        </button>
-
-        <button onclick="alterarStatus('${docSnap.id}',${data.ativa})">
-          ${data.ativa ? "Encerrar" : "Reativar"}
-        </button>
-
-        <button onclick="excluirCotacao('${docSnap.id}')">
-          Excluir
-        </button>
+        ${data.nome}<br><br>
+        <button onclick="excluirProduto('${docSnap.id}')">Excluir</button>
       </div>
     `;
   });
 });
 
-window.gerenciarProdutos = function(id,nome){
-  localStorage.setItem("cotacaoId",id);
-  localStorage.setItem("cotacaoNome",nome);
-  window.location.href="produtos.html";
+window.excluirProduto = async function(id){
+  await deleteDoc(doc(db,"cotacoes",cotacaoId,"produtos",id));
 }
 
-window.alterarStatus = async function(id,statusAtual){
-  try{
-    await updateDoc(doc(db,"cotacoes",id),{
-      ativa:!statusAtual
-    });
-  }catch(e){
-    alert("Erro ao alterar status");
-    console.error(e);
-  }
-}
-
-window.excluirCotacao = async function(id){
-  if(confirm("Deseja excluir esta cotação?")){
-    try{
-      await deleteDoc(doc(db,"cotacoes",id));
-    }catch(e){
-      alert("Erro ao excluir");
-      console.error(e);
-    }
-  }
+window.voltar = function(){
+  window.location.href="admin.html";
 }
 </script>
 
