@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fornecedor - São Raimundo</title>
+<title>Fornecedor - Cotação</title>
 
 <style>
 body{
@@ -25,15 +25,11 @@ header{
   padding:20px;
 }
 
-input, button{
-  padding:10px;
+input,button{
+  padding:8px;
   margin:5px;
-  border-radius:8px;
+  border-radius:6px;
   border:none;
-}
-
-input{
-  width:120px;
 }
 
 button{
@@ -49,10 +45,10 @@ button:hover{
 .card{
   background:white;
   color:black;
-  padding:15px;
+  padding:10px;
   margin:10px auto;
-  border-radius:10px;
-  max-width:400px;
+  border-radius:8px;
+  max-width:500px;
 }
 </style>
 </head>
@@ -60,16 +56,23 @@ button:hover{
 <body>
 
 <header>
-São Raimundo Supermercado - Cotação Fornecedor
+São Raimundo Supermercado - FORNECEDOR
 </header>
 
 <div class="container">
 
-<h3>Seu Nome:</h3>
-<input type="text" id="fornecedor" placeholder="Nome da empresa">
+<div id="identificacao">
+  <h3>Identificação do Fornecedor</h3>
+  <input type="text" id="nomeFornecedor" placeholder="Nome da Empresa">
+  <br>
+  <button onclick="iniciar()">Iniciar Cotação</button>
+</div>
 
-<h3>Cotações Ativas</h3>
-<div id="cotacoes"></div>
+<div id="cotacaoArea" style="display:none;">
+  <h3>Preencha os preços</h3>
+  <div id="listaProdutos"></div>
+  <button onclick="enviar()">Enviar Cotação</button>
+</div>
 
 </div>
 
@@ -78,101 +81,94 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { 
   getFirestore, 
   collection, 
-  onSnapshot, 
-  getDocs,
-  addDoc
+  getDocs, 
+  addDoc 
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCeJtoTDcNmA8aMLtRrHR-CoZUQkbe5TYk",
-  authDomain: "cot-online-sao-raimundo-sup.firebaseapp.com",
-  projectId: "cot-online-sao-raimundo-sup",
-  storageBucket: "cot-online-sao-raimundo-sup.firebasestorage.app",
-  messagingSenderId: "57432026650",
-  appId: "1:57432026650:web:8a47dd3f22b40bd6e02ba3"
+  apiKey: "AIzaSyA6a_KyBljuDADZYybCKyg2noMhq7i4WPw",
+  authDomain: "cotacao-sao-raimundo-oficial.firebaseapp.com",
+  projectId: "cotacao-sao-raimundo-oficial",
+  storageBucket: "cotacao-sao-raimundo-oficial.firebasestorage.app",
+  messagingSenderId: "999255626219",
+  appId: "1:999255626219:web:653adf6dedde30237fc9ae"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const container = document.getElementById("cotacoes");
+const urlParams = new URLSearchParams(window.location.search);
+const cotacaoId = urlParams.get("id");
 
-// 🔥 LISTAR COTAÇÕES ATIVAS
-onSnapshot(collection(db,"cotacoes"), async (snapshot)=>{
-  container.innerHTML="";
-  
-  for (const docSnap of snapshot.docs) {
+if(!cotacaoId){
+  document.body.innerHTML="<h2>Nenhuma cotação informada.</h2>";
+}
 
-    const data = docSnap.data();
-    if(data.ativa){
+let produtos = [];
 
-      let html = `<div class="card"><h4>${data.nome}</h4>`;
+window.iniciar = async function(){
 
-      const produtosSnap = await getDocs(
-        collection(db,"cotacoes",docSnap.id,"produtos")
-      );
+  const nomeFornecedor = document.getElementById("nomeFornecedor").value;
+  if(!nomeFornecedor) return alert("Digite o nome da empresa");
 
-      produtosSnap.forEach((prod)=>{
-        const p = prod.data();
-        html += `
-          <b>${p.nome}</b> (${p.unidade})<br>
-          <input type="number" step="0.01" placeholder="Preço" id="${docSnap.id}_${prod.id}">
-          <br><br>
-        `;
-      });
+  localStorage.setItem("fornecedorNome",nomeFornecedor);
 
-      html += `
-        <button onclick="finalizar('${docSnap.id}','${data.nome}')">
-          Finalizar Cotação
-        </button>
-      </div>`;
+  document.getElementById("identificacao").style.display="none";
+  document.getElementById("cotacaoArea").style.display="block";
 
-      container.innerHTML += html;
-    }
-  }
-});
+  const snapshot = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
+  const lista = document.getElementById("listaProdutos");
 
+  lista.innerHTML="";
+  produtos = [];
 
-// 🔥 FUNÇÃO FINALIZAR CORRIGIDA
-window.finalizar = async function(cotacaoId,cotacaoNome){
+  snapshot.forEach((doc)=>{
+    const data = doc.data();
+    produtos.push({id:doc.id,...data});
 
-  const fornecedor = document.getElementById("fornecedor").value;
-  if(!fornecedor) return alert("Digite o nome do fornecedor");
-
-  const produtosSnap = await getDocs(
-    collection(db,"cotacoes",cotacaoId,"produtos")
-  );
-
-  let produtosObjeto = {};
-  let mensagem = `Cotação: ${cotacaoNome}\nFornecedor: ${fornecedor}\n\n`;
-
-  produtosSnap.forEach((prod)=>{
-    const p = prod.data();
-    const valor = parseFloat(
-      document.getElementById(cotacaoId+"_"+prod.id).value || "0"
-    );
-
-    produtosObjeto[p.nome] = valor;
-    mensagem += `${p.nome} - R$ ${valor}\n`;
+    lista.innerHTML+=`
+      <div class="card">
+        <b>${data.nome}</b><br>
+        Quantidade: ${data.quantidade} ${data.unidade}<br><br>
+        <input type="number" step="0.01" placeholder="Preço unitário" id="preco_${doc.id}">
+      </div>
+    `;
   });
 
-  // ✅ SALVA NO LUGAR CORRETO (DENTRO DA COTAÇÃO)
-  await addDoc(
-    collection(db,"cotacoes",cotacaoId,"respostas"),
-    {
-      fornecedor:fornecedor,
-      produtos:produtosObjeto,
-      data:new Date().toLocaleDateString()
+}
+
+window.enviar = async function(){
+
+  const nomeFornecedor = localStorage.getItem("fornecedorNome");
+
+  const itens = [];
+
+  produtos.forEach(prod=>{
+    const preco = document.getElementById("preco_"+prod.id).value;
+    if(preco){
+      itens.push({
+        nome: prod.nome,
+        quantidade: prod.quantidade,
+        unidade: prod.unidade,
+        preco: parseFloat(preco)
+      });
     }
-  );
+  });
+
+  if(itens.length === 0){
+    return alert("Informe pelo menos um preço");
+  }
+
+  await addDoc(collection(db,"cotacoes",cotacaoId,"respostas"),{
+    fornecedor: nomeFornecedor,
+    dataEnvio: new Date(),
+    itens: itens
+  });
 
   alert("Cotação enviada com sucesso!");
-
-  // 🔥 ENVIA PARA WHATSAPP
-  const numero = "5599988592997";
-  const url = "https://wa.me/"+numero+"?text="+encodeURIComponent(mensagem);
-  window.open(url,"_blank");
+  location.reload();
 }
+
 </script>
 
 </body>
