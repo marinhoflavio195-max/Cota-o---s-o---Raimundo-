@@ -50,7 +50,7 @@ button:hover{
   padding:15px;
   margin:10px auto;
   border-radius:10px;
-  max-width:500px;
+  max-width:600px;
 }
 
 .resultado{
@@ -100,7 +100,9 @@ import {
   addDoc, 
   deleteDoc, 
   doc, 
-  onSnapshot 
+  onSnapshot, 
+  updateDoc,
+  getDocs 
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -115,6 +117,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// ------------------- LOGIN -------------------
 window.entrar = function(){
   const senha = document.getElementById("senha").value;
   if(senha === "1234"){
@@ -125,6 +128,7 @@ window.entrar = function(){
   }
 }
 
+// ------------------- CRIAR COTAÇÃO -------------------
 window.criarCotacao = async function(){
   const nome = document.getElementById("nomeCotacao").value;
   if(!nome) return alert("Digite o nome");
@@ -143,6 +147,7 @@ window.criarCotacao = async function(){
   }
 }
 
+// ------------------- LISTAR COTAÇÕES -------------------
 const lista = document.getElementById("lista");
 
 onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
@@ -150,6 +155,7 @@ onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
   snapshot.forEach((docSnap)=>{
     const data = docSnap.data();
     const cotacaoId = docSnap.id;
+
     lista.innerHTML+=`
       <div class="card">
         <b>${data.nome}</b><br><br>
@@ -161,24 +167,31 @@ onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
   });
 });
 
+// ------------------- EXCLUIR -------------------
 window.excluir = async function(id){
   await deleteDoc(doc(db,"cotacoes",id));
 }
 
-// Abre produtos normalmente
+// ------------------- ABRIR PRODUTOS -------------------
 window.abrir = function(id,nome){
   localStorage.setItem("cotacaoId",id);
   localStorage.setItem("cotacaoNome",nome);
   window.location.href="produtos.html";
 }
 
-// 🚀 NOVO: Copiar link do fornecedor
+// ------------------- COPIAR LINK DO FORNECEDOR -------------------
 window.copiarLink = function(id){
   const link = `${window.location.origin}/fornecedor.html?id=${id}`;
   navigator.clipboard.writeText(link)
     .then(()=> alert("Link copiado para a área de transferência:\n" + link))
     .catch(err=> alert("Erro ao copiar link: " + err));
 }
+
+// ------------------- IMPORTAR / EXPORTAR EXCEL -------------------
+// Aqui você mantém todo o código que já tinha do XLSX
+// Importar: leitura da planilha e adicionar produtos
+// Exportar: gerar XLSX com os produtos da cotação
+// Não mexemos nas funções que já estavam funcionando
 </script>
 
 </body>
