@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Produtos - São Raimundo</title>
+<title>Produtos da Cotação</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
 body{
@@ -17,7 +19,7 @@ body{
 header{
   background:#B22222;
   padding:20px;
-  font-size:22px;
+  font-size:20px;
   font-weight:bold;
 }
 
@@ -25,7 +27,7 @@ header{
   padding:20px;
 }
 
-input,button{
+input,select,button{
   padding:10px;
   margin:5px;
   border-radius:8px;
@@ -55,25 +57,9 @@ button:hover{
 
 <body>
 
-<header>
-São Raimundo Supermercado - PRODUTOS
-</header>
+<header id="titulo"></header>
 
-<div class="container">
-
-<h2 id="tituloCotacao"></h2>
-
-<h3>Adicionar Produto</h3>
-<input type="text" id="nomeProduto" placeholder="Nome do produto">
-<button onclick="adicionarProduto()">Adicionar</button>
-
-<h3>Lista de Produtos</h3>
-<div id="listaProdutos"></div>
-
-<br>
-<button onclick="voltar()">Voltar</button>
-
-</div>
+<div class="container" id="conteudo"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -87,12 +73,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA6a_KyBljuDADZYybCKyg2noMhq7i4WPw",
-  authDomain: "cotacao-sao-raimundo-oficial.firebaseapp.com",
-  projectId: "cotacao-sao-raimundo-oficial",
-  storageBucket: "cotacao-sao-raimundo-oficial.firebasestorage.app",
-  messagingSenderId: "999255626219",
-  appId: "1:999255626219:web:653adf6dedde30237fc9ae"
+  apiKey: "AIzaSyCeJtoTDcNmA8aMLtRrHR-CoZUQkbe5TYk",
+  authDomain: "cot-online-sao-raimundo-sup.firebaseapp.com",
+  projectId: "cot-online-sao-raimundo-sup",
+  storageBucket: "cot-online-sao-raimundo-sup.firebasestorage.app",
+  messagingSenderId: "57432026650",
+  appId: "1:57432026650:web:8a47dd3f22b40bd6e02ba3"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -101,48 +87,118 @@ const db = getFirestore(app);
 const cotacaoId = localStorage.getItem("cotacaoId");
 const cotacaoNome = localStorage.getItem("cotacaoNome");
 
-if (!cotacaoId || !cotacaoNome) {
-  alert("Nenhuma cotação selecionada!");
-  window.location.href = "admin.html";
-}
+const titulo = document.getElementById("titulo");
+const conteudo = document.getElementById("conteudo");
 
-document.getElementById("tituloCotacao").innerText = "Cotação: " + cotacaoNome;
+if(!cotacaoId){
+  titulo.innerHTML = "Nenhuma cotação criada";
+  conteudo.innerHTML = `
+    <h2>Nenhuma cotação selecionada.</h2>
+    <button onclick="voltar()">Voltar</button>
+  `;
+} else {
 
-window.adicionarProduto = async function(){
-  const nome = document.getElementById("nomeProduto").value;
+  titulo.innerHTML = "Cotação: " + cotacaoNome;
 
-  if(!nome) return alert("Digite o nome do produto");
+  conteudo.innerHTML = `
+    <h2>Adicionar Produto</h2>
+    <input type="text" id="nomeProduto" placeholder="Nome do produto">
+    <input type="number" id="quantidade" placeholder="Quantidade">
+    <select id="unidade">
+      <option value="UN">UN</option>
+      <option value="KG">KG</option>
+      <option value="CX">CX</option>
+      <option value="FD">FD</option>
+    </select>
+    <input type="text" id="observacao" placeholder="Observação (opcional)">
+    <br>
+    <button onclick="adicionarProduto()">Adicionar</button>
+    <button onclick="exportarExcel()">Exportar Excel</button>
 
-  try{
-    await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
-      nome: nome,
-      criadoEm: new Date()
+    <h2>Lista de Produtos</h2>
+    <div id="listaProdutos"></div>
+
+    <br>
+    <button onclick="voltar()">Voltar</button>
+  `;
+
+  let produtos = [];
+
+  const lista = document.getElementById("listaProdutos");
+
+  onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), (snapshot)=>{
+    lista.innerHTML="";
+    produtos = [];
+
+    snapshot.forEach((docSnap)=>{
+      const data = docSnap.data();
+      produtos.push(data);
+
+      lista.innerHTML+=`
+        <div class="card">
+          <b>${data.nome}</b><br>
+          Quantidade: ${data.quantidade} ${data.unidade}<br>
+          ${data.observacao ? "Obs: "+data.observacao+"<br>" : ""}
+          <br>
+          <button onclick="excluir('${docSnap.id}')">Excluir</button>
+        </div>
+      `;
     });
-
-    document.getElementById("nomeProduto").value = "";
-  }catch(e){
-    alert("Erro: " + e.message);
-  }
-}
-
-const lista = document.getElementById("listaProdutos");
-
-onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), (snapshot)=>{
-  lista.innerHTML="";
-  snapshot.forEach((docSnap)=>{
-    const data = docSnap.data();
-
-    lista.innerHTML+=`
-      <div class="card">
-        ${data.nome}<br><br>
-        <button onclick="excluirProduto('${docSnap.id}')">Excluir</button>
-      </div>
-    `;
   });
-});
 
-window.excluirProduto = async function(id){
-  await deleteDoc(doc(db,"cotacoes",cotacaoId,"produtos",id));
+  window.adicionarProduto = async function(){
+
+    const nome = document.getElementById("nomeProduto").value;
+    const quantidade = document.getElementById("quantidade").value;
+    const unidade = document.getElementById("unidade").value;
+    const observacao = document.getElementById("observacao").value;
+
+    if(!nome || !quantidade){
+      alert("Preencha nome e quantidade!");
+      return;
+    }
+
+    try{
+      await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+        nome,
+        quantidade,
+        unidade,
+        observacao
+      });
+
+      document.getElementById("nomeProduto").value="";
+      document.getElementById("quantidade").value="";
+      document.getElementById("observacao").value="";
+
+    }catch(e){
+      alert("Erro ao salvar: "+e.message);
+    }
+  }
+
+  window.excluir = async function(id){
+    await deleteDoc(doc(db,"cotacoes",cotacaoId,"produtos",id));
+  }
+
+  window.exportarExcel = function(){
+
+    if(produtos.length === 0){
+      alert("Nenhum produto para exportar!");
+      return;
+    }
+
+    const dados = produtos.map(p => ({
+      Produto: p.nome,
+      Quantidade: p.quantidade,
+      Unidade: p.unidade,
+      Observacao: p.observacao || ""
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dados);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Cotacao");
+
+    XLSX.writeFile(workbook, "cotacao_"+cotacaoNome+".xlsx");
+  }
 }
 
 window.voltar = function(){
