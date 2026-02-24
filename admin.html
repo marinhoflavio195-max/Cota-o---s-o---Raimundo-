@@ -42,6 +42,12 @@ button:hover{ background:#cc0000; }
   border-radius:10px;
   max-width:500px;
 }
+.btn-secundario{
+  background:#444;
+}
+.btn-secundario:hover{
+  background:#222;
+}
 </style>
 </head>
 
@@ -156,12 +162,30 @@ onSnapshot(collection(db,"cotacoes"), snapshot=>{
     const inicio = data.inicio?.seconds ? new Date(data.inicio.seconds*1000).toLocaleString() : "-";
     const fim = data.fim?.seconds ? new Date(data.fim.seconds*1000).toLocaleString() : "-";
 
+    const linkFornecedor = window.location.origin + 
+      "/fornecedor.html?id=" + docSnap.id + 
+      "&nome=" + encodeURIComponent(data.nome);
+
     lista.innerHTML+=`
       <div class="card">
         <b>${data.nome}</b><br>
         Início: ${inicio}<br>
-        Fim: ${fim}<br>
-        <button onclick="abrir('${docSnap.id}','${data.nome}')">Gerenciar Produtos</button>
+        Fim: ${fim}<br><br>
+
+        <button onclick="abrir('${docSnap.id}','${data.nome}')">
+          Gerenciar Produtos
+        </button>
+
+        <button class="btn-secundario" onclick="abrirFornecedor('${docSnap.id}','${data.nome}')">
+          Abrir Tela Fornecedor
+        </button>
+
+        <button class="btn-secundario" onclick="copiarLink('${linkFornecedor}')">
+          Copiar Link Fornecedor
+        </button>
+
+        <br><br>
+
         <button onclick="excluir('${docSnap.id}')">Excluir</button>
       </div>
     `;
@@ -180,10 +204,29 @@ window.abrir = (id,nome)=>{
   window.location.href="produtos.html";
 }
 
+/* ============================= */
+/* NOVAS FUNÇÕES SEGURAS */
+/* ============================= */
+
+window.copiarLink = function(link){
+  navigator.clipboard.writeText(link);
+  alert("Link copiado com sucesso!");
+}
+
+window.abrirFornecedor = function(id,nome){
+  const link = window.location.origin + 
+    "/fornecedor.html?id=" + id + 
+    "&nome=" + encodeURIComponent(nome);
+  window.open(link,"_blank");
+}
+
+/* ============================= */
+/* EXPORTAR RELATÓRIO */
+/* ============================= */
+
 window.exportarRelatorio = async function(){
 
   const cotacaoId = selectExport.value;
-  const cotacaoRef = doc(db,"cotacoes",cotacaoId);
   const cotacaoSnap = await getDocs(collection(db,"cotacoes"));
   let cotacaoData;
 
@@ -197,7 +240,7 @@ window.exportarRelatorio = async function(){
   const fim = new Date(cotacaoData.fim.seconds*1000);
 
   if(agora < fim){
-    alert("Cotação ainda está ativa.");
+    alert("⏳ Cotação ainda está ativa.");
     return;
   }
 
@@ -235,6 +278,7 @@ window.exportarRelatorio = async function(){
   XLSX.utils.book_append_sheet(wb, ws, "Relatório Final");
   XLSX.writeFile(wb, "Relatorio_Final_Cotacao.xlsx");
 }
+
 </script>
 </body>
 </html>
