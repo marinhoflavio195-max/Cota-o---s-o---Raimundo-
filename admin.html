@@ -162,13 +162,10 @@ onSnapshot(collection(db,"cotacoes"), snapshot=>{
     const inicio = data.inicio?.seconds ? new Date(data.inicio.seconds*1000).toLocaleString() : "-";
     const fim = data.fim?.seconds ? new Date(data.fim.seconds*1000).toLocaleString() : "-";
 
-    const linkFornecedor = window.location.origin + 
-      "/fornecedor.html?id=" + docSnap.id + 
-      "&nome=" + encodeURIComponent(data.nome);
-
     lista.innerHTML+=`
       <div class="card">
         <b>${data.nome}</b><br>
+        <b>ID da Cotação:</b> ${docSnap.id}<br>
         Início: ${inicio}<br>
         Fim: ${fim}<br><br>
 
@@ -176,12 +173,8 @@ onSnapshot(collection(db,"cotacoes"), snapshot=>{
           Gerenciar Produtos
         </button>
 
-        <button class="btn-secundario" onclick="abrirFornecedor('${docSnap.id}','${data.nome}')">
-          Abrir Tela Fornecedor
-        </button>
-
-        <button class="btn-secundario" onclick="copiarLink('${linkFornecedor}')">
-          Copiar Link Fornecedor
+        <button class="btn-secundario" onclick="copiarId('${docSnap.id}')">
+          Copiar ID da Cotação
         </button>
 
         <br><br>
@@ -204,25 +197,10 @@ window.abrir = (id,nome)=>{
   window.location.href="produtos.html";
 }
 
-/* ============================= */
-/* NOVAS FUNÇÕES SEGURAS */
-/* ============================= */
-
-window.copiarLink = function(link){
-  navigator.clipboard.writeText(link);
-  alert("Link copiado com sucesso!");
+window.copiarId = function(id){
+  navigator.clipboard.writeText(id);
+  alert("ID da cotação copiado com sucesso!");
 }
-
-window.abrirFornecedor = function(id,nome){
-  const link = window.location.origin + 
-    "/fornecedor.html?id=" + id + 
-    "&nome=" + encodeURIComponent(nome);
-  window.open(link,"_blank");
-}
-
-/* ============================= */
-/* EXPORTAR RELATÓRIO */
-/* ============================= */
 
 window.exportarRelatorio = async function(){
 
