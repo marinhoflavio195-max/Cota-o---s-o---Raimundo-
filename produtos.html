@@ -15,35 +15,25 @@ body{
   color:white;
   text-align:center;
 }
-
 header{
   background:#B22222;
   padding:20px;
   font-size:20px;
   font-weight:bold;
 }
-
-.container{
-  padding:20px;
-}
-
+.container{ padding:20px; }
 input, select, button{
   padding:10px;
   margin:5px;
   border-radius:8px;
   border:none;
 }
-
 button{
   background:#ff0000;
   color:white;
   cursor:pointer;
 }
-
-button:hover{
-  background:#cc0000;
-}
-
+button:hover{ background:#cc0000; }
 .card{
   background:white;
   color:black;
@@ -65,22 +55,17 @@ São Raimundo Supermercado - Produtos da Cotação
 
 <h2 id="titulo"></h2>
 
-<input type="text" id="nomeProduto" placeholder="Nome do produto">
-<br>
+<input type="text" id="nomeProduto" placeholder="Nome do produto"><br>
 
 <select id="unidade">
-  <option value="kg">Kg</option>
-  <option value="pacote">Pacote</option>
-  <option value="caixa">Caixa</option>
-  <option value="unidade">Unidade</option>
-</select>
-<br>
+  <option value="kg">KG</option>
+  <option value="pc">PC</option>
+  <option value="un">UN</option>
+  <option value="cx">CX</option>
+</select><br>
 
-<input type="number" id="quantidade" placeholder="Quantidade">
-<br>
-
-<input type="text" id="observacao" placeholder="Observação (opcional)">
-<br>
+<input type="number" id="quantidade" placeholder="Quantidade"><br>
+<input type="text" id="observacao" placeholder="Observação (opcional)"><br>
 
 <button onclick="adicionarProduto()">Adicionar Produto</button>
 <button onclick="importarExcel()">Importar Excel</button>
@@ -102,11 +87,12 @@ import {
   addDoc, 
   deleteDoc, 
   doc, 
-  onSnapshot 
+  onSnapshot,
+  getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA6a_KyBljuDADZYybCKyg2noMhq7i4WPw",
+  apiKey: "SUA_API_KEY",
   authDomain: "cotacao-sao-raimundo-oficial.firebaseapp.com",
   projectId: "cotacao-sao-raimundo-oficial",
   storageBucket: "cotacao-sao-raimundo-oficial.firebasestorage.app",
@@ -124,11 +110,17 @@ document.getElementById("titulo").innerText = "Cotação: " + cotacaoNome;
 
 const lista = document.getElementById("listaProdutos");
 
+if(!cotacaoId){
+  alert("Nenhuma cotação selecionada.");
+  window.location.href="admin.html";
+}
+
+// ---------------- ADICIONAR ----------------
 window.adicionarProduto = async function(){
-  const nome = document.getElementById("nomeProduto").value;
-  const unidade = document.getElementById("unidade").value;
-  const quantidade = document.getElementById("quantidade").value;
-  const observacao = document.getElementById("observacao").value;
+  const nome = nomeProduto.value;
+  const unidade = unidade.value;
+  const quantidade = quantidade.value;
+  const observacao = observacao.value;
 
   if(!nome || !quantidade) return alert("Digite nome e quantidade");
 
@@ -136,12 +128,12 @@ window.adicionarProduto = async function(){
     nome, unidade, quantidade, observacao
   });
 
-  document.getElementById("nomeProduto").value="";
-  document.getElementById("quantidade").value="";
-  document.getElementById("observacao").value="";
+  nomeProduto.value="";
+  quantidade.value="";
+  observacao.value="";
 }
 
-// OBS: Atualização para exibir produtos em tempo real
+// ---------------- LISTAR ----------------
 onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), (snapshot)=>{
   lista.innerHTML="";
   snapshot.forEach((docSnap)=>{
@@ -165,63 +157,48 @@ window.voltar = function(){
   window.location.href="admin.html";
 }
 
-// ======================
-// IMPORTAR EXCEL
-// ======================
+// ---------------- IMPORTAR EXCEL ----------------
 window.importarExcel = function(){
   const input = document.createElement("input");
   input.type = "file";
-  input.accept = ".xlsx, .xls";
+  input.accept = ".xlsx,.xls";
   input.onchange = async e => {
     const file = e.target.files[0];
     const data = await file.arrayBuffer();
     const workbook = XLSX.read(data);
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const json = XLSX.utils.sheet_to_json(worksheet);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(sheet);
 
     for(const linha of json){
-      const nome = linha.nome;
-      const quantidade = linha.quantidade;
-      let unidade = linha.unidade.trim().toLowerCase();
-      const observacao = linha.observacao || "";
-
-      // Se unidade não existir no select, adiciona
-      const select = document.getElementById("unidade");
-      if(!Array.from(select.options).some(opt=>opt.value===unidade)){
-        const option = document.createElement("option");
-        option.value = unidade;
-        option.text = unidade.toUpperCase();
-        select.add(option);
-      }
-
-      // Adiciona produto no Firestore
-      if(nome && quantidade){
+      if(linha.nome && linha.quantidade){
         await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
-          nome,
-          quantidade,
-          unidade,
-          observacao
+          nome: linha.nome,
+          quantidade: linha.quantidade,
+          unidade: (linha.unidade || "kg").toLowerCase(),
+          observacao: linha.observacao || ""
         });
       }
     }
-    alert("Produtos importados com sucesso!");
+
+    alert("Importação concluída!");
   };
   input.click();
 }
 
-// ======================
-// EXPORTAR EXCEL
-// ======================
+// ---------------- EXPORTAR EXCEL ----------------
 window.exportarExcel = async function(){
   const snapshot = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
-  const produtos = snapshot.docs.map(doc => doc.data());
-  if(produtos.length===0) return alert("Nenhum produto para exportar");
+  const produtos = snapshot.docs.map(doc=>doc.data());
 
-  const worksheet = XLSX.utils.json_to_sheet(produtos);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Produtos");
-  XLSX.writeFile(workbook, `cotacao-${cotacaoNome}.xlsx`);
+  if(produtos.length===0){
+    alert("Nenhum produto cadastrado.");
+    return;
+  }
+
+  const ws = XLSX.utils.json_to_sheet(produtos);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Produtos");
+  XLSX.writeFile(wb, `Produtos-${cotacaoNome}.xlsx`);
 }
 </script>
 
