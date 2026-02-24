@@ -15,35 +15,25 @@ body{
   color:white;
   text-align:center;
 }
-
 header{
   background:#B22222;
   padding:20px;
   font-size:22px;
   font-weight:bold;
 }
-
-.container{
-  padding:20px;
-}
-
+.container{ padding:20px; }
 input,button,select{
   padding:10px;
   margin:5px;
   border-radius:8px;
   border:none;
 }
-
 button{
   background:#ff0000;
   color:white;
   cursor:pointer;
 }
-
-button:hover{
-  background:#cc0000;
-}
-
+button:hover{ background:#cc0000; }
 .card{
   background:white;
   color:black;
@@ -111,7 +101,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA6a_KyBljuDADZYybCKyg2noMhq7i4WPw",
+  apiKey: "SUA_API_KEY",
   authDomain: "cotacao-sao-raimundo-oficial.firebaseapp.com",
   projectId: "cotacao-sao-raimundo-oficial",
   storageBucket: "cotacao-sao-raimundo-oficial.firebasestorage.app",
@@ -124,8 +114,8 @@ const db = getFirestore(app);
 
 window.entrar = function(){
   if(document.getElementById("senha").value === "1234"){
-    login.style.display="none";
-    painel.style.display="block";
+    document.getElementById("login").style.display="none";
+    document.getElementById("painel").style.display="block";
   } else {
     alert("Senha incorreta!");
   }
@@ -141,6 +131,7 @@ window.criarCotacao = async function(){
   await addDoc(collection(db,"cotacoes"),{
     nome,
     status:"aberta",
+    ativa:true,
     inicio:new Date(inicio),
     fim:new Date(fim),
     dataCriacao:new Date()
@@ -148,6 +139,8 @@ window.criarCotacao = async function(){
 
   alert("Cotação criada!");
   nomeCotacao.value="";
+  inicioCotacao.value="";
+  fimCotacao.value="";
 }
 
 const lista = document.getElementById("lista");
@@ -190,22 +183,21 @@ window.abrir = (id,nome)=>{
 window.exportarRelatorio = async function(){
 
   const cotacaoId = selectExport.value;
-
-  const cotacaoDoc = await getDocs(collection(db,"cotacoes"));
+  const cotacaoRef = doc(db,"cotacoes",cotacaoId);
+  const cotacaoSnap = await getDocs(collection(db,"cotacoes"));
   let cotacaoData;
 
-  cotacaoDoc.forEach(docSnap=>{
-    if(docSnap.id===cotacaoId){
-      cotacaoData=docSnap.data();
+  cotacaoSnap.forEach(d=>{
+    if(d.id===cotacaoId){
+      cotacaoData=d.data();
     }
   });
 
   const agora = new Date();
-
   const fim = new Date(cotacaoData.fim.seconds*1000);
 
   if(agora < fim){
-    alert("Cotação ainda está ativa. Aguarde o término.");
+    alert("Cotação ainda está ativa.");
     return;
   }
 
@@ -216,19 +208,16 @@ window.exportarRelatorio = async function(){
   for(const produtoDoc of produtosSnap.docs){
 
     const produto = produtoDoc.data();
-
     const precosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos",produtoDoc.id,"precos"));
 
-    let menorPreco = null;
-    let vencedor = "";
+    let menorPreco=null;
+    let vencedor="";
 
-    precosSnap.forEach(precoDoc=>{
-      const precoData = precoDoc.data();
-      const valor = parseFloat(precoData.preco);
-
-      if(menorPreco===null || valor < menorPreco){
-        menorPreco = valor;
-        vencedor = precoData.fornecedor;
+    precosSnap.forEach(p=>{
+      const valor=parseFloat(p.data().preco);
+      if(menorPreco===null || valor<menorPreco){
+        menorPreco=valor;
+        vencedor=p.data().fornecedor;
       }
     });
 
@@ -244,10 +233,8 @@ window.exportarRelatorio = async function(){
   const ws = XLSX.utils.json_to_sheet(relatorio);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Relatório Final");
-
   XLSX.writeFile(wb, "Relatorio_Final_Cotacao.xlsx");
 }
-
 </script>
 </body>
 </html>
