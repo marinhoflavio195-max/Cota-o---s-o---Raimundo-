@@ -27,7 +27,7 @@ header{
   padding:20px;
 }
 
-input,select,button{
+input,button{
   padding:10px;
   margin:5px;
   border-radius:8px;
@@ -50,7 +50,7 @@ button:hover{
   padding:15px;
   margin:10px auto;
   border-radius:10px;
-  max-width:600px;
+  max-width:450px;
 }
 
 .resultado{
@@ -72,6 +72,7 @@ São Raimundo Supermercado - ADMIN
 
 <div class="container">
 
+<!-- Login -->
 <div id="login">
   <h2>Login Administrador</h2>
   <input type="password" id="senha" placeholder="Digite a senha">
@@ -79,13 +80,21 @@ São Raimundo Supermercado - ADMIN
   <button onclick="entrar()">Entrar</button>
 </div>
 
+<!-- Painel Admin -->
 <div id="painel" style="display:none;">
 
 <h2>Criar Nova Cotação</h2>
-<input type="text" id="nomeCotacao" placeholder="Nome da cotação">
-<button onclick="criarCotacao()">Criar</button>
+<input type="text" id="nomeCotacao" placeholder="Nome da cotação"><br>
 
-<h2>Cotações</h2>
+<label style="color:white;">Início da Cotação:</label>
+<input type="datetime-local" id="inicioCotacao"><br>
+
+<label style="color:white;">Término da Cotação:</label>
+<input type="datetime-local" id="fimCotacao"><br>
+
+<button onclick="criarCotacao()">Criar Cotação</button>
+
+<h2>Lista de Cotações</h2>
 <div id="lista"></div>
 
 </div>
@@ -100,9 +109,8 @@ import {
   addDoc, 
   deleteDoc, 
   doc, 
-  onSnapshot, 
-  updateDoc,
-  getDocs 
+  onSnapshot,
+  updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -117,7 +125,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// ------------------- LOGIN -------------------
+// ----------------- LOGIN -----------------
 window.entrar = function(){
   const senha = document.getElementById("senha").value;
   if(senha === "1234"){
@@ -128,70 +136,69 @@ window.entrar = function(){
   }
 }
 
-// ------------------- CRIAR COTAÇÃO -------------------
+// ----------------- CRIAR COTAÇÃO -----------------
 window.criarCotacao = async function(){
   const nome = document.getElementById("nomeCotacao").value;
-  if(!nome) return alert("Digite o nome");
+  const inicio = document.getElementById("inicioCotacao").value;
+  const fim = document.getElementById("fimCotacao").value;
+
+  if(!nome) return alert("Digite o nome da cotação");
+  if(!inicio || !fim) return alert("Defina início e término da cotação");
 
   try {
     await addDoc(collection(db,"cotacoes"),{
       nome: nome,
       status: "aberta",
-      dataCriacao: new Date()
+      dataCriacao: new Date(),
+      inicio: new Date(inicio),
+      fim: new Date(fim)
     });
 
     alert("Cotação criada com sucesso!");
-    document.getElementById("nomeCotacao").value = "";
+    document.getElementById("nomeCotacao").value="";
+    document.getElementById("inicioCotacao").value="";
+    document.getElementById("fimCotacao").value="";
+
   } catch (e) {
     alert("Erro ao salvar: " + e.message);
   }
 }
 
-// ------------------- LISTAR COTAÇÕES -------------------
+// ----------------- LISTAR COTAÇÕES -----------------
 const lista = document.getElementById("lista");
 
 onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
   lista.innerHTML="";
   snapshot.forEach((docSnap)=>{
     const data = docSnap.data();
-    const cotacaoId = docSnap.id;
+
+    const inicioStr = data.inicio ? new Date(data.inicio.seconds*1000).toLocaleString() : "-";
+    const fimStr = data.fim ? new Date(data.fim.seconds*1000).toLocaleString() : "-";
 
     lista.innerHTML+=`
       <div class="card">
-        <b>${data.nome}</b><br><br>
-        <button onclick="abrir('${cotacaoId}','${data.nome}')">Gerenciar Produtos</button>
-        <button onclick="excluir('${cotacaoId}')">Excluir</button>
-        <button onclick="copiarLink('${cotacaoId}')">Copiar Link do Fornecedor</button>
+        <b>${data.nome}</b><br>
+        Status: ${data.status}<br>
+        Início: ${inicioStr}<br>
+        Fim: ${fimStr}<br><br>
+        <button onclick="abrirProdutos('${docSnap.id}','${data.nome}')">Gerenciar Produtos</button>
+        <button onclick="excluirCotacao('${docSnap.id}')">Excluir</button>
       </div>
     `;
   });
 });
 
-// ------------------- EXCLUIR -------------------
-window.excluir = async function(id){
-  await deleteDoc(doc(db,"cotacoes",id));
-}
-
-// ------------------- ABRIR PRODUTOS -------------------
-window.abrir = function(id,nome){
+// ----------------- ABRIR PRODUTOS -----------------
+window.abrirProdutos = function(id,nome){
   localStorage.setItem("cotacaoId",id);
   localStorage.setItem("cotacaoNome",nome);
   window.location.href="produtos.html";
 }
 
-// ------------------- COPIAR LINK DO FORNECEDOR -------------------
-window.copiarLink = function(id){
-  const link = `${window.location.origin}/fornecedor.html?id=${id}`;
-  navigator.clipboard.writeText(link)
-    .then(()=> alert("Link copiado para a área de transferência:\n" + link))
-    .catch(err=> alert("Erro ao copiar link: " + err));
+// ----------------- EXCLUIR -----------------
+window.excluirCotacao = async function(id){
+  await deleteDoc(doc(db,"cotacoes",id));
 }
-
-// ------------------- IMPORTAR / EXPORTAR EXCEL -------------------
-// Aqui você mantém todo o código que já tinha do XLSX
-// Importar: leitura da planilha e adicionar produtos
-// Exportar: gerar XLSX com os produtos da cotação
-// Não mexemos nas funções que já estavam funcionando
 </script>
 
 </body>
