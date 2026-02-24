@@ -27,7 +27,7 @@ header{
   padding:20px;
 }
 
-input,button{
+input,button,select{
   padding:10px;
   margin:5px;
   border-radius:8px;
@@ -50,7 +50,7 @@ button:hover{
   padding:15px;
   margin:10px auto;
   border-radius:10px;
-  max-width:450px;
+  max-width:500px;
 }
 </style>
 </head>
@@ -75,22 +75,30 @@ São Raimundo Supermercado - ADMIN
 <h2>Criar Nova Cotação</h2>
 <input type="text" id="nomeCotacao" placeholder="Nome da cotação"><br>
 
-<label>Início da Cotação:</label><br>
+<label>Início:</label>
 <input type="datetime-local" id="inicioCotacao"><br>
 
-<label>Término da Cotação:</label><br>
+<label>Fim:</label>
 <input type="datetime-local" id="fimCotacao"><br>
 
 <button onclick="criarCotacao()">Criar Cotação</button>
 
+<hr>
+
 <h2>Lista de Cotações</h2>
 <div id="lista"></div>
 
-</div>
+<hr>
 
+<h2>Exportar Relatório Final</h2>
+<select id="cotacaoExport"></select><br>
+<button onclick="exportarRelatorio()">Exportar Relatório Final</button>
+
+</div>
 </div>
 
 <script type="module">
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { 
   getFirestore, 
@@ -98,7 +106,8 @@ import {
   addDoc, 
   deleteDoc, 
   doc, 
-  onSnapshot
+  onSnapshot,
+  getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -114,85 +123,131 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 window.entrar = function(){
-  const senha = document.getElementById("senha").value;
-  if(senha === "1234"){
-    document.getElementById("login").style.display="none";
-    document.getElementById("painel").style.display="block";
+  if(document.getElementById("senha").value === "1234"){
+    login.style.display="none";
+    painel.style.display="block";
   } else {
     alert("Senha incorreta!");
   }
 }
 
 window.criarCotacao = async function(){
-  const nome = document.getElementById("nomeCotacao").value;
-  const inicio = document.getElementById("inicioCotacao").value;
-  const fim = document.getElementById("fimCotacao").value;
+  const nome = nomeCotacao.value;
+  const inicio = inicioCotacao.value;
+  const fim = fimCotacao.value;
 
-  if(!nome) return alert("Digite o nome da cotação");
-  if(!inicio || !fim) return alert("Defina início e término");
+  if(!nome || !inicio || !fim) return alert("Preencha todos os campos");
 
-  try {
-    await addDoc(collection(db,"cotacoes"),{
-      nome: nome,
-      status: "ativa", // 🔴 CORRIGIDO AQUI
-      dataCriacao: new Date(),
-      inicio: new Date(inicio),
-      fim: new Date(fim)
-    });
+  await addDoc(collection(db,"cotacoes"),{
+    nome,
+    status:"aberta",
+    inicio:new Date(inicio),
+    fim:new Date(fim),
+    dataCriacao:new Date()
+  });
 
-    alert("Cotação criada com sucesso!");
-
-    document.getElementById("nomeCotacao").value="";
-    document.getElementById("inicioCotacao").value="";
-    document.getElementById("fimCotacao").value="";
-
-  } catch (e) {
-    alert("Erro ao salvar: " + e.message);
-  }
+  alert("Cotação criada!");
+  nomeCotacao.value="";
 }
 
 const lista = document.getElementById("lista");
+const selectExport = document.getElementById("cotacaoExport");
 
-onSnapshot(collection(db,"cotacoes"), (snapshot)=>{
+onSnapshot(collection(db,"cotacoes"), snapshot=>{
   lista.innerHTML="";
+  selectExport.innerHTML="";
 
-  snapshot.forEach((docSnap)=>{
+  snapshot.forEach(docSnap=>{
     const data = docSnap.data();
 
-    let inicioStr = "-";
-    let fimStr = "-";
-
-    if(data.inicio?.toDate){
-      inicioStr = data.inicio.toDate().toLocaleString();
-    }
-
-    if(data.fim?.toDate){
-      fimStr = data.fim.toDate().toLocaleString();
-    }
+    const inicio = data.inicio?.seconds ? new Date(data.inicio.seconds*1000).toLocaleString() : "-";
+    const fim = data.fim?.seconds ? new Date(data.fim.seconds*1000).toLocaleString() : "-";
 
     lista.innerHTML+=`
       <div class="card">
         <b>${data.nome}</b><br>
-        Status: ${data.status}<br>
-        Início: ${inicioStr}<br>
-        Fim: ${fimStr}<br><br>
-        <button onclick="abrirProdutos('${docSnap.id}','${data.nome}')">Gerenciar Produtos</button>
-        <button onclick="excluirCotacao('${docSnap.id}')">Excluir</button>
+        Início: ${inicio}<br>
+        Fim: ${fim}<br>
+        <button onclick="abrir('${docSnap.id}','${data.nome}')">Gerenciar Produtos</button>
+        <button onclick="excluir('${docSnap.id}')">Excluir</button>
       </div>
     `;
+
+    selectExport.innerHTML+=`<option value="${docSnap.id}">${data.nome}</option>`;
   });
 });
 
-window.abrirProdutos = function(id,nome){
+window.excluir = async id=>{
+  await deleteDoc(doc(db,"cotacoes",id));
+}
+
+window.abrir = (id,nome)=>{
   localStorage.setItem("cotacaoId",id);
   localStorage.setItem("cotacaoNome",nome);
   window.location.href="produtos.html";
 }
 
-window.excluirCotacao = async function(id){
-  await deleteDoc(doc(db,"cotacoes",id));
-}
-</script>
+window.exportarRelatorio = async function(){
 
+  const cotacaoId = selectExport.value;
+
+  const cotacaoDoc = await getDocs(collection(db,"cotacoes"));
+  let cotacaoData;
+
+  cotacaoDoc.forEach(docSnap=>{
+    if(docSnap.id===cotacaoId){
+      cotacaoData=docSnap.data();
+    }
+  });
+
+  const agora = new Date();
+
+  const fim = new Date(cotacaoData.fim.seconds*1000);
+
+  if(agora < fim){
+    alert("Cotação ainda está ativa. Aguarde o término.");
+    return;
+  }
+
+  const produtosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
+
+  let relatorio=[];
+
+  for(const produtoDoc of produtosSnap.docs){
+
+    const produto = produtoDoc.data();
+
+    const precosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos",produtoDoc.id,"precos"));
+
+    let menorPreco = null;
+    let vencedor = "";
+
+    precosSnap.forEach(precoDoc=>{
+      const precoData = precoDoc.data();
+      const valor = parseFloat(precoData.preco);
+
+      if(menorPreco===null || valor < menorPreco){
+        menorPreco = valor;
+        vencedor = precoData.fornecedor;
+      }
+    });
+
+    relatorio.push({
+      Produto: produto.nome,
+      Quantidade: produto.quantidade,
+      Unidade: produto.unidade,
+      "Menor Preço": menorPreco ?? "Sem lance",
+      "Fornecedor Vencedor": vencedor || "-"
+    });
+  }
+
+  const ws = XLSX.utils.json_to_sheet(relatorio);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Relatório Final");
+
+  XLSX.writeFile(wb, "Relatorio_Final_Cotacao.xlsx");
+}
+
+</script>
 </body>
 </html>
