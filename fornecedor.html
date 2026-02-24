@@ -13,18 +13,13 @@ body{
   color:white;
   text-align:center;
 }
-
 header{
   background:#B22222;
   padding:20px;
   font-size:20px;
   font-weight:bold;
 }
-
-.container{
-  padding:20px;
-}
-
+.container{ padding:20px; }
 .card{
   background:white;
   color:black;
@@ -33,7 +28,18 @@ header{
   border-radius:10px;
   max-width:500px;
 }
-
+input{
+  padding:8px;
+  margin-top:5px;
+}
+button{
+  padding:8px;
+  margin-top:5px;
+  background:#ff0000;
+  color:white;
+  border:none;
+  border-radius:6px;
+}
 #aviso{
   background:#fff;
   color:#000;
@@ -59,10 +65,10 @@ São Raimundo Supermercado - Fornecedor
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, getDoc, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA6a_KyBljuDADZYybCKyg2noMhq7i4WPw",
+  apiKey: "SUA_API_KEY",
   authDomain: "cotacao-sao-raimundo-oficial.firebaseapp.com",
   projectId: "cotacao-sao-raimundo-oficial",
   storageBucket: "cotacao-sao-raimundo-oficial.firebasestorage.app",
@@ -81,55 +87,71 @@ const aviso = document.getElementById("aviso");
 const lista = document.getElementById("listaProdutos");
 
 if(!cotacaoId){
-  titulo.style.display = "none";
-  aviso.style.display = "block";
-  aviso.innerText = "❌ Nenhuma cotação informada!";
+  aviso.style.display="block";
+  aviso.innerText="Nenhuma cotação informada.";
 } else {
-  titulo.innerText = "Cotação: " + cotacaoNome;
 
-  // Verifica se a cotação está ativa e dentro do período
-  getDoc(doc(db,"cotacoes",cotacaoId)).then(docSnap=>{
-    if(docSnap.exists()){
-      const data = docSnap.data();
-      const agora = new Date();
-      const inicio = data.inicio ? data.inicio.toDate ? data.inicio.toDate() : new Date(data.inicio.seconds*1000) : null;
-      const fim = data.fim ? data.fim.toDate ? data.fim.toDate() : new Date(data.fim.seconds*1000) : null;
+  titulo.innerText="Cotação: "+cotacaoNome;
 
-      if(!data.ativa){
-        aviso.style.display = "block";
-        aviso.innerText = "⛔ Cotação inativa!";
-      } else if(inicio && agora < inicio){
-        aviso.style.display = "block";
-        aviso.innerText = "⏳ Cotação ainda não começou!";
-      } else if(fim && agora > fim){
-        aviso.style.display = "block";
-        aviso.innerText = "⛔ Cotação encerrada!";
-      } else {
-        // Cotação dentro do período, listar produtos
-        onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), snapshot=>{
-          lista.innerHTML = "";
-          if(snapshot.empty){
-            aviso.style.display = "block";
-            aviso.innerText = "❌ Nenhum produto cadastrado nesta cotação!";
-          } else {
-            snapshot.forEach(docSnap=>{
-              const p = docSnap.data();
-              lista.innerHTML += `
-                <div class="card">
-                  <b>${p.nome}</b><br>
-                  Qtd: ${p.quantidade} ${p.unidade}<br>
-                  Obs: ${p.observacao || "-"}<br>
-                </div>
-              `;
-            });
-          }
-        });
-      }
-    } else {
-      aviso.style.display = "block";
-      aviso.innerText = "❌ Nenhuma cotação encontrada!";
+  const cotacaoRef = doc(db,"cotacoes",cotacaoId);
+
+  getDoc(cotacaoRef).then(docSnap=>{
+    if(!docSnap.exists()){
+      aviso.style.display="block";
+      aviso.innerText="Cotação não encontrada.";
+      return;
     }
+
+    const data = docSnap.data();
+    const agora = new Date();
+    const inicio = data.inicio.toDate();
+    const fim = data.fim.toDate();
+
+    if(agora < inicio){
+      aviso.style.display="block";
+      aviso.innerText="⏳ Cotação ainda não começou.";
+      return;
+    }
+
+    if(agora > fim){
+      aviso.style.display="block";
+      aviso.innerText="⛔ Cotação encerrada.";
+      return;
+    }
+
+    // LISTAR PRODUTOS
+    onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), snapshot=>{
+      lista.innerHTML="";
+      snapshot.forEach(prodDoc=>{
+        const p = prodDoc.data();
+        lista.innerHTML+=`
+          <div class="card">
+            <b>${p.nome}</b><br>
+            Qtd: ${p.quantidade} ${p.unidade}<br>
+            <input type="number" placeholder="Seu preço" id="preco-${prodDoc.id}">
+            <br>
+            <button onclick="enviarPreco('${prodDoc.id}')">Enviar Preço</button>
+          </div>
+        `;
+      });
+    });
+
   });
+}
+
+window.enviarPreco = async function(produtoId){
+  const preco = document.getElementById("preco-"+produtoId).value;
+  const fornecedor = prompt("Digite o nome da sua empresa:");
+
+  if(!preco || !fornecedor) return alert("Preencha os dados");
+
+  await addDoc(collection(db,"cotacoes",cotacaoId,"produtos",produtoId,"precos"),{
+    preco,
+    fornecedor,
+    data:new Date()
+  });
+
+  alert("Preço enviado com sucesso!");
 }
 </script>
 
