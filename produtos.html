@@ -53,13 +53,13 @@ button:hover{
   max-width:500px;
 }
 
-.resultado{
+#aviso{
   background:#fff;
   color:#000;
-  padding:10px;
-  margin-top:10px;
+  padding:15px;
+  margin:10px auto;
   border-radius:10px;
-  font-size:14px;
+  max-width:500px;
 }
 </style>
 </head>
@@ -67,33 +67,29 @@ button:hover{
 <body>
 
 <header>
-São Raimundo Supermercado - Produtos da Cotação
+São Raimundo Supermercado - Produtos
 </header>
 
 <div class="container">
 
 <h2 id="titulo"></h2>
+<div id="aviso" style="display:none;"></div>
 
-<!-- Adicionar produto manual -->
-<input type="text" id="nomeProduto" placeholder="Nome do produto">
-<input type="text" id="unidadeProduto" placeholder="Unidade">
-<input type="text" id="observacaoProduto" placeholder="Observação">
-<br>
+<input type="text" id="nomeProduto" placeholder="Nome do produto"><br>
+<input type="number" id="quantidadeProduto" placeholder="Quantidade"><br>
+<input type="text" id="unidadeProduto" placeholder="Unidade (Ex: kg, pacote, und)"><br>
+<input type="text" id="observacaoProduto" placeholder="Observação"><br>
 <button onclick="adicionarProduto()">Adicionar Produto</button>
-
-<!-- Importar Excel -->
-<h3>Importar produtos via Excel</h3>
-<input type="file" id="excelFile" accept=".xlsx, .xls">
-<button onclick="importarExcel()">Importar</button>
-
-<!-- Exportar Excel -->
-<h3>Exportar cotação</h3>
-<button onclick="exportarExcel()">Exportar Cotação Final</button>
+<br><br>
+<input type="file" id="arquivoExcel">
+<button onclick="importarExcel()">Importar Excel</button>
+<button onclick="exportarExcel()">Exportar Excel</button>
 
 <h3>Lista de Produtos</h3>
 <div id="listaProdutos"></div>
 
-<div id="mensagemTempo" class="resultado"></div>
+<br>
+<button onclick="voltar()">Voltar ao Admin</button>
 
 </div>
 
@@ -106,7 +102,6 @@ import {
   deleteDoc, 
   doc, 
   onSnapshot,
-  getDocs,
   getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -124,64 +119,69 @@ const db = getFirestore(app);
 
 const cotacaoId = localStorage.getItem("cotacaoId");
 const cotacaoNome = localStorage.getItem("cotacaoNome");
+const titulo = document.getElementById("titulo");
+const aviso = document.getElementById("aviso");
 
-document.getElementById("titulo").innerText = "Cotação: " + cotacaoNome;
+if(!cotacaoId){
+  titulo.style.display = "none";
+  aviso.style.display = "block";
+  aviso.innerText = "❌ Nenhuma cotação selecionada!";
+} else {
+  titulo.innerText = "Cotação: " + cotacaoNome;
 
-const lista = document.getElementById("listaProdutos");
-const mensagemTempo = document.getElementById("mensagemTempo");
+  // Verificar horário da cotação
+  getDoc(doc(db,"cotacoes",cotacaoId)).then(docSnap=>{
+    if(docSnap.exists()){
+      const data = docSnap.data();
+      const agora = new Date();
+      const inicio = data.inicio.toDate ? data.inicio.toDate() : new Date(data.inicio.seconds*1000);
+      const fim = data.fim.toDate ? data.fim.toDate() : new Date(data.fim.seconds*1000);
 
-// ------------------- Buscar tempo da cotação -------------------
-let inicioCotacao = null;
-let fimCotacao = null;
-
-async function buscarTempoCotacao(){
-  const cotRef = doc(db,"cotacoes",cotacaoId);
-  const cotSnap = await getDoc(cotRef);
-  if(cotSnap.exists()){
-    const data = cotSnap.data();
-    inicioCotacao = data.inicio ? new Date(data.inicio.seconds*1000) : null;
-    fimCotacao = data.fim ? new Date(data.fim.seconds*1000) : null;
-  }
+      if(agora < inicio){
+        aviso.style.display = "block";
+        aviso.innerText = "⏳ Cotação ainda não começou!";
+      } else if(agora > fim){
+        aviso.style.display = "block";
+        aviso.innerText = "⛔ Cotação encerrada!";
+      }
+    }
+  });
 }
 
-// ------------------- Adicionar Produto Manual -------------------
-window.adicionarProduto = async function(){
-  const now = new Date();
-  await buscarTempoCotacao();
-  if(inicioCotacao && now < inicioCotacao){
-    return alert("Cotação ainda não começou!");
-  }
-  if(fimCotacao && now > fimCotacao){
-    return alert("Cotação encerrada!");
-  }
+// ----------------- Lista de produtos -----------------
+const lista = document.getElementById("listaProdutos");
 
+window.adicionarProduto = async function(){
+  if(!cotacaoId) return;
   const nome = document.getElementById("nomeProduto").value;
+  const quantidade = document.getElementById("quantidadeProduto").value;
   const unidade = document.getElementById("unidadeProduto").value;
-  const observacao = document.getElementById("observacaoProduto").value;
+  const obs = document.getElementById("observacaoProduto").value;
 
   if(!nome) return alert("Digite o nome do produto");
 
   await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
-    nome: nome,
-    unidade: unidade,
-    observacao: observacao
+    nome:nome,
+    quantidade:quantidade,
+    unidade:unidade,
+    observacao:obs
   });
 
   document.getElementById("nomeProduto").value="";
+  document.getElementById("quantidadeProduto").value="";
   document.getElementById("unidadeProduto").value="";
   document.getElementById("observacaoProduto").value="";
 }
 
-// ------------------- Listar Produtos -------------------
 onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), (snapshot)=>{
   lista.innerHTML="";
-  snapshot.forEach((docSnap)=>{
+  snapshot.forEach(docSnap=>{
     const data = docSnap.data();
     lista.innerHTML+=`
       <div class="card">
         <b>${data.nome}</b><br>
-        Unidade: ${data.unidade}<br>
-        Observação: ${data.observacao || "-"}<br><br>
+        Qtd: ${data.quantidade} ${data.unidade}<br>
+        Obs: ${data.observacao}<br><br>
         <button onclick="excluirProduto('${docSnap.id}')">Excluir</button>
       </div>
     `;
@@ -192,71 +192,40 @@ window.excluirProduto = async function(id){
   await deleteDoc(doc(db,"cotacoes",cotacaoId,"produtos",id));
 }
 
-// ------------------- Importar Excel -------------------
+// ----------------- Importar Excel -----------------
 window.importarExcel = function(){
-  const fileInput = document.getElementById("excelFile");
-  const file = fileInput.files[0];
-  if(!file) return alert("Selecione um arquivo Excel");
+  const arquivo = document.getElementById("arquivoExcel").files[0];
+  if(!arquivo) return alert("Selecione um arquivo Excel");
 
   const reader = new FileReader();
-  reader.onload = async (e) => {
+  reader.onload = e=>{
     const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, {type:"array"});
+    const workbook = XLSX.read(data,{type:'array'});
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     const json = XLSX.utils.sheet_to_json(sheet);
 
-    for(const item of json){
-      await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
-        nome: item.nome,
-        unidade: item.unidade,
-        observacao: item.observacao
+    json.forEach(async item=>{
+      if(item.nome) await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+        nome:item.nome || "",
+        quantidade:item.quantidade || "",
+        unidade:item.unidade || "",
+        observacao:item.observacao || ""
       });
-    }
-    alert("Importação concluída!");
-  };
-  reader.readAsArrayBuffer(file);
+    });
+  }
+  reader.readAsArrayBuffer(arquivo);
 }
 
-// ------------------- Exportar Excel Consolidado -------------------
-window.exportarExcel = async function(){
-  const produtosSnapshot = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
-  const produtos = [];
-  produtosSnapshot.forEach(docSnap=>{
-    produtos.push({...docSnap.data(), id: docSnap.id});
-  });
-
-  // Buscar respostas de fornecedores
-  const respostasSnapshot = await getDocs(collection(db,"respostas"));
-  let menores = {};
-  respostasSnapshot.forEach(docSnap=>{
-    const data = docSnap.data();
-    if(data.cotacaoId === cotacaoId){
-      data.produtos.forEach(p=>{
-        let preco = parseFloat(p.valor);
-        if(!menores[p.nome] || preco < menores[p.nome].preco){
-          menores[p.nome] = {
-            fornecedor: data.fornecedor,
-            preco: preco
-          };
-        }
-      });
-    }
-  });
-
-  // Criar XLSX
-  const ws_data = [["Produto","Unidade","Observação","Menor Preço","Fornecedor"]];
-  produtos.forEach(p=>{
-    const menor = menores[p.nome] || {preco:"-", fornecedor:"-"};
-    ws_data.push([p.nome,p.unidade,p.observacao || "-", menor.preco, menor.fornecedor]);
-  });
-
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(ws_data);
-  XLSX.utils.book_append_sheet(wb, ws, "Cotação Final");
-  XLSX.writeFile(wb, `cotacao_${cotacaoNome}.xlsx`);
+// ----------------- Exportar Excel -----------------
+window.exportarExcel = function(){
+  alert("Função de exportar vai trazer a cotação finalizada com todos os preços, menor preço e fornecedor");
 }
 
+// ----------------- Voltar -----------------
+window.voltar = function(){
+  window.location.href="admin.html";
+}
 </script>
 
 </body>
