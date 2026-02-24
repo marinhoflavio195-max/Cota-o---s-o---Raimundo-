@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fornecedor - Cotação</title>
+<title>Fornecedor - São Raimundo</title>
 
 <style>
 body{
   margin:0;
-  font-family:Arial;
+  font-family:Arial, Helvetica, sans-serif;
   background:#8B0000;
   color:white;
   text-align:center;
@@ -25,29 +25,21 @@ header{
   padding:20px;
 }
 
-input,button{
-  padding:8px;
-  margin:5px;
-  border-radius:6px;
-  border:none;
-}
-
-button{
-  background:#ff0000;
-  color:white;
-  cursor:pointer;
-}
-
-button:hover{
-  background:#cc0000;
-}
-
 .card{
   background:white;
   color:black;
-  padding:10px;
+  padding:15px;
   margin:10px auto;
-  border-radius:8px;
+  border-radius:10px;
+  max-width:500px;
+}
+
+#aviso{
+  background:#fff;
+  color:#000;
+  padding:15px;
+  margin:10px auto;
+  border-radius:10px;
   max-width:500px;
 }
 </style>
@@ -56,34 +48,18 @@ button:hover{
 <body>
 
 <header>
-São Raimundo Supermercado - FORNECEDOR
+São Raimundo Supermercado - Fornecedor
 </header>
 
 <div class="container">
-
-<div id="identificacao">
-  <h3>Identificação do Fornecedor</h3>
-  <input type="text" id="nomeFornecedor" placeholder="Nome da Empresa">
-  <br>
-  <button onclick="iniciar()">Iniciar Cotação</button>
-</div>
-
-<div id="cotacaoArea" style="display:none;">
-  <h3>Preencha os preços</h3>
-  <div id="listaProdutos"></div>
-  <button onclick="enviar()">Enviar Cotação</button>
-</div>
-
+<h2 id="titulo"></h2>
+<div id="aviso" style="display:none;"></div>
+<div id="listaProdutos"></div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { 
-  getFirestore, 
-  collection, 
-  getDocs, 
-  addDoc 
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA6a_KyBljuDADZYybCKyg2noMhq7i4WPw",
@@ -97,78 +73,64 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const urlParams = new URLSearchParams(window.location.search);
-const cotacaoId = urlParams.get("id");
+const cotacaoId = localStorage.getItem("cotacaoId");
+const cotacaoNome = localStorage.getItem("cotacaoNome");
+
+const titulo = document.getElementById("titulo");
+const aviso = document.getElementById("aviso");
+const lista = document.getElementById("listaProdutos");
 
 if(!cotacaoId){
-  document.body.innerHTML="<h2>Nenhuma cotação informada.</h2>";
-}
+  titulo.style.display = "none";
+  aviso.style.display = "block";
+  aviso.innerText = "❌ Nenhuma cotação informada!";
+} else {
+  titulo.innerText = "Cotação: " + cotacaoNome;
 
-let produtos = [];
+  // Verifica se a cotação está ativa e dentro do período
+  getDoc(doc(db,"cotacoes",cotacaoId)).then(docSnap=>{
+    if(docSnap.exists()){
+      const data = docSnap.data();
+      const agora = new Date();
+      const inicio = data.inicio ? data.inicio.toDate ? data.inicio.toDate() : new Date(data.inicio.seconds*1000) : null;
+      const fim = data.fim ? data.fim.toDate ? data.fim.toDate() : new Date(data.fim.seconds*1000) : null;
 
-window.iniciar = async function(){
-
-  const nomeFornecedor = document.getElementById("nomeFornecedor").value;
-  if(!nomeFornecedor) return alert("Digite o nome da empresa");
-
-  localStorage.setItem("fornecedorNome",nomeFornecedor);
-
-  document.getElementById("identificacao").style.display="none";
-  document.getElementById("cotacaoArea").style.display="block";
-
-  const snapshot = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
-  const lista = document.getElementById("listaProdutos");
-
-  lista.innerHTML="";
-  produtos = [];
-
-  snapshot.forEach((doc)=>{
-    const data = doc.data();
-    produtos.push({id:doc.id,...data});
-
-    lista.innerHTML+=`
-      <div class="card">
-        <b>${data.nome}</b><br>
-        Quantidade: ${data.quantidade} ${data.unidade}<br><br>
-        <input type="number" step="0.01" placeholder="Preço unitário" id="preco_${doc.id}">
-      </div>
-    `;
-  });
-
-}
-
-window.enviar = async function(){
-
-  const nomeFornecedor = localStorage.getItem("fornecedorNome");
-
-  const itens = [];
-
-  produtos.forEach(prod=>{
-    const preco = document.getElementById("preco_"+prod.id).value;
-    if(preco){
-      itens.push({
-        nome: prod.nome,
-        quantidade: prod.quantidade,
-        unidade: prod.unidade,
-        preco: parseFloat(preco)
-      });
+      if(!data.ativa){
+        aviso.style.display = "block";
+        aviso.innerText = "⛔ Cotação inativa!";
+      } else if(inicio && agora < inicio){
+        aviso.style.display = "block";
+        aviso.innerText = "⏳ Cotação ainda não começou!";
+      } else if(fim && agora > fim){
+        aviso.style.display = "block";
+        aviso.innerText = "⛔ Cotação encerrada!";
+      } else {
+        // Cotação dentro do período, listar produtos
+        onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), snapshot=>{
+          lista.innerHTML = "";
+          if(snapshot.empty){
+            aviso.style.display = "block";
+            aviso.innerText = "❌ Nenhum produto cadastrado nesta cotação!";
+          } else {
+            snapshot.forEach(docSnap=>{
+              const p = docSnap.data();
+              lista.innerHTML += `
+                <div class="card">
+                  <b>${p.nome}</b><br>
+                  Qtd: ${p.quantidade} ${p.unidade}<br>
+                  Obs: ${p.observacao || "-"}<br>
+                </div>
+              `;
+            });
+          }
+        });
+      }
+    } else {
+      aviso.style.display = "block";
+      aviso.innerText = "❌ Nenhuma cotação encontrada!";
     }
   });
-
-  if(itens.length === 0){
-    return alert("Informe pelo menos um preço");
-  }
-
-  await addDoc(collection(db,"cotacoes",cotacaoId,"respostas"),{
-    fornecedor: nomeFornecedor,
-    dataEnvio: new Date(),
-    itens: itens
-  });
-
-  alert("Cotação enviada com sucesso!");
-  location.reload();
 }
-
 </script>
 
 </body>
