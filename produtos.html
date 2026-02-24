@@ -3,72 +3,44 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fornecedor - São Raimundo</title>
+<title>Produtos - São Raimundo</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
 body{
   margin:0;
-  font-family:'Segoe UI', Arial, sans-serif;
-  background:#f4f6f9;
-  color:#333;
-}
-
-header{
-  background:linear-gradient(90deg,#8B0000,#B22222);
-  padding:20px;
+  font-family:Arial, Helvetica, sans-serif;
+  background:#8B0000;
   color:white;
-  font-size:22px;
-  font-weight:600;
   text-align:center;
-  box-shadow:0 4px 10px rgba(0,0,0,0.2);
 }
-
-.container{
-  max-width:900px;
-  margin:auto;
-  padding:30px 20px;
+header{
+  background:#B22222;
+  padding:20px;
+  font-size:20px;
+  font-weight:bold;
 }
-
+.container{ padding:20px; }
+input, select, button{
+  padding:10px;
+  margin:5px;
+  border-radius:8px;
+  border:none;
+}
+button{
+  background:#ff0000;
+  color:white;
+  cursor:pointer;
+}
+button:hover{ background:#cc0000; }
 .card{
   background:white;
-  padding:20px;
-  margin:15px 0;
-  border-radius:12px;
-  box-shadow:0 4px 15px rgba(0,0,0,0.08);
-}
-
-input{
-  width:100%;
-  padding:12px;
-  border-radius:8px;
-  border:1px solid #ccc;
-  margin-top:10px;
-  box-sizing:border-box;
-}
-
-button{
-  margin-top:10px;
-  padding:12px;
-  background:#B22222;
-  color:white;
-  border:none;
-  border-radius:8px;
-  font-weight:600;
-  cursor:pointer;
-  transition:0.2s;
-}
-
-button:hover{
-  background:#8B0000;
-}
-
-#aviso{
-  background:#fff3cd;
-  color:#856404;
+  color:black;
   padding:15px;
+  margin:10px auto;
   border-radius:10px;
-  margin-bottom:20px;
-  font-weight:600;
+  max-width:400px;
 }
 </style>
 </head>
@@ -76,19 +48,158 @@ button:hover{
 <body>
 
 <header>
-São Raimundo Supermercado - Fornecedor
+São Raimundo Supermercado - Produtos da Cotação
 </header>
 
 <div class="container">
+
 <h2 id="titulo"></h2>
-<div id="aviso" style="display:none;"></div>
+
+<input type="text" id="nomeProduto" placeholder="Nome do produto"><br>
+
+<select id="unidade">
+  <option value="kg">KG</option>
+  <option value="pc">PC</option>
+  <option value="un">UN</option>
+  <option value="cx">CX</option>
+</select><br>
+
+<input type="number" id="quantidade" placeholder="Quantidade"><br>
+<input type="text" id="observacao" placeholder="Observação (opcional)"><br>
+
+<button onclick="adicionarProduto()">Adicionar Produto</button>
+<button onclick="importarExcel()">Importar Excel</button>
+<button onclick="exportarExcel()">Exportar Excel</button>
+
+<h3>Lista de Produtos</h3>
 <div id="listaProdutos"></div>
+
+<br>
+<button onclick="voltar()">Voltar ao Admin</button>
+
 </div>
 
 <script type="module">
-/* 🔥 AQUI FICA SEU MESMO SCRIPT ORIGINAL
-   NÃO ALTEREI NADA DA LÓGICA
-   COLE EXATAMENTE O MESMO JS QUE VOCÊ JÁ ESTÁ USANDO */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "SUA_API_KEY",
+  authDomain: "cotacao-sao-raimundo-oficial.firebaseapp.com",
+  projectId: "cotacao-sao-raimundo-oficial",
+  storageBucket: "cotacao-sao-raimundo-oficial.firebasestorage.app",
+  messagingSenderId: "999255626219",
+  appId: "1:999255626219:web:653adf6dedde30237fc9ae"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const cotacaoId = localStorage.getItem("cotacaoId");
+const cotacaoNome = localStorage.getItem("cotacaoNome");
+
+document.getElementById("titulo").innerText = "Cotação: " + cotacaoNome;
+
+const lista = document.getElementById("listaProdutos");
+
+if(!cotacaoId){
+  alert("Nenhuma cotação selecionada.");
+  window.location.href="admin.html";
+}
+
+// ---------------- ADICIONAR ----------------
+window.adicionarProduto = async function(){
+  const nome = nomeProduto.value;
+  const unidade = unidade.value;
+  const quantidade = quantidade.value;
+  const observacao = observacao.value;
+
+  if(!nome || !quantidade) return alert("Digite nome e quantidade");
+
+  await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+    nome, unidade, quantidade, observacao
+  });
+
+  nomeProduto.value="";
+  quantidade.value="";
+  observacao.value="";
+}
+
+// ---------------- LISTAR ----------------
+onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), (snapshot)=>{
+  lista.innerHTML="";
+  snapshot.forEach((docSnap)=>{
+    const data = docSnap.data();
+    lista.innerHTML+=`
+      <div class="card">
+        <b>${data.nome}</b><br>
+        Qtd: ${data.quantidade} ${data.unidade}<br>
+        Obs: ${data.observacao || "-"}<br><br>
+        <button onclick="excluirProduto('${docSnap.id}')">Excluir</button>
+      </div>
+    `;
+  });
+});
+
+window.excluirProduto = async function(id){
+  await deleteDoc(doc(db,"cotacoes",cotacaoId,"produtos",id));
+}
+
+window.voltar = function(){
+  window.location.href="admin.html";
+}
+
+// ---------------- IMPORTAR EXCEL ----------------
+window.importarExcel = function(){
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".xlsx,.xls";
+  input.onchange = async e => {
+    const file = e.target.files[0];
+    const data = await file.arrayBuffer();
+    const workbook = XLSX.read(data);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(sheet);
+
+    for(const linha of json){
+      if(linha.nome && linha.quantidade){
+        await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+          nome: linha.nome,
+          quantidade: linha.quantidade,
+          unidade: (linha.unidade || "kg").toLowerCase(),
+          observacao: linha.observacao || ""
+        });
+      }
+    }
+
+    alert("Importação concluída!");
+  };
+  input.click();
+}
+
+// ---------------- EXPORTAR EXCEL ----------------
+window.exportarExcel = async function(){
+  const snapshot = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
+  const produtos = snapshot.docs.map(doc=>doc.data());
+
+  if(produtos.length===0){
+    alert("Nenhum produto cadastrado.");
+    return;
+  }
+
+  const ws = XLSX.utils.json_to_sheet(produtos);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Produtos");
+  XLSX.writeFile(wb, `Produtos-${cotacaoNome}.xlsx`);
+}
 </script>
 
 </body>
