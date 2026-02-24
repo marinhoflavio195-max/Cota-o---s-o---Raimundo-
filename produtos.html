@@ -3,9 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Produtos - São Raimundo</title>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<title>Fornecedor - São Raimundo</title>
 
 <style>
 body{
@@ -31,35 +29,30 @@ header{
   padding:30px 20px;
 }
 
-h2, h3{
-  margin-top:30px;
-}
-
-.form-box{
+.card{
   background:white;
-  padding:25px;
-  border-radius:15px;
-  box-shadow:0 5px 20px rgba(0,0,0,0.08);
-  margin-bottom:30px;
+  padding:20px;
+  margin:15px 0;
+  border-radius:12px;
+  box-shadow:0 4px 15px rgba(0,0,0,0.08);
 }
 
-input, select{
+input{
   width:100%;
   padding:12px;
-  margin:10px 0;
   border-radius:8px;
   border:1px solid #ccc;
-  font-size:15px;
+  margin-top:10px;
   box-sizing:border-box;
 }
 
 button{
-  padding:12px 18px;
-  margin:8px 5px 8px 0;
-  border-radius:8px;
-  border:none;
+  margin-top:10px;
+  padding:12px;
   background:#B22222;
   color:white;
+  border:none;
+  border-radius:8px;
   font-weight:600;
   cursor:pointer;
   transition:0.2s;
@@ -67,32 +60,15 @@ button{
 
 button:hover{
   background:#8B0000;
-  transform:scale(1.03);
 }
 
-.card{
-  background:white;
-  padding:20px;
-  margin:15px 0;
-  border-radius:12px;
-  box-shadow:0 4px 15px rgba(0,0,0,0.08);
-  transition:0.2s;
-}
-
-.card:hover{
-  transform:translateY(-3px);
-}
-
-.actions{
-  margin-top:10px;
-}
-
-.actions button{
-  background:#555;
-}
-
-.actions button:hover{
-  background:#333;
+#aviso{
+  background:#fff3cd;
+  color:#856404;
+  padding:15px;
+  border-radius:10px;
+  margin-bottom:20px;
+  font-weight:600;
 }
 </style>
 </head>
@@ -100,37 +76,13 @@ button:hover{
 <body>
 
 <header>
-São Raimundo Supermercado - Produtos da Cotação
+São Raimundo Supermercado - Fornecedor
 </header>
 
 <div class="container">
-
 <h2 id="titulo"></h2>
-
-<div class="form-box">
-<input type="text" id="nomeProduto" placeholder="Nome do produto">
-
-<select id="unidade">
-  <option value="kg">Kg</option>
-  <option value="pacote">Pacote</option>
-  <option value="caixa">Caixa</option>
-  <option value="unidade">Unidade</option>
-</select>
-
-<input type="number" id="quantidade" placeholder="Quantidade">
-
-<input type="text" id="observacao" placeholder="Observação (opcional)">
-
-<button onclick="adicionarProduto()">Adicionar Produto</button>
-<button onclick="importarExcel()">Importar Excel</button>
-<button onclick="exportarExcel()">Exportar Excel</button>
-</div>
-
-<h3>Lista de Produtos</h3>
+<div id="aviso" style="display:none;"></div>
 <div id="listaProdutos"></div>
-
-<button onclick="voltar()">Voltar ao Admin</button>
-
 </div>
 
 <script type="module">
