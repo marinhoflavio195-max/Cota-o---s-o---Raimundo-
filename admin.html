@@ -162,10 +162,13 @@ onSnapshot(collection(db,"cotacoes"), snapshot=>{
     const inicio = data.inicio?.seconds ? new Date(data.inicio.seconds*1000).toLocaleString() : "-";
     const fim = data.fim?.seconds ? new Date(data.fim.seconds*1000).toLocaleString() : "-";
 
+    const linkFornecedor = window.location.origin +
+      "/fornecedor.html?id=" + docSnap.id;
+
     lista.innerHTML+=`
       <div class="card">
         <b>${data.nome}</b><br>
-        <b>ID da Cotação:</b> ${docSnap.id}<br>
+        <b>ID:</b> ${docSnap.id}<br>
         Início: ${inicio}<br>
         Fim: ${fim}<br><br>
 
@@ -173,8 +176,8 @@ onSnapshot(collection(db,"cotacoes"), snapshot=>{
           Gerenciar Produtos
         </button>
 
-        <button class="btn-secundario" onclick="copiarId('${docSnap.id}')">
-          Copiar ID da Cotação
+        <button class="btn-secundario" onclick="copiarLink('${linkFornecedor}')">
+          Copiar Link do Fornecedor
         </button>
 
         <br><br>
@@ -187,6 +190,11 @@ onSnapshot(collection(db,"cotacoes"), snapshot=>{
   });
 });
 
+window.copiarLink = function(link){
+  navigator.clipboard.writeText(link);
+  alert("Link do fornecedor copiado com sucesso!");
+}
+
 window.excluir = async id=>{
   await deleteDoc(doc(db,"cotacoes",id));
 }
@@ -195,11 +203,6 @@ window.abrir = (id,nome)=>{
   localStorage.setItem("cotacaoId",id);
   localStorage.setItem("cotacaoNome",nome);
   window.location.href="produtos.html";
-}
-
-window.copiarId = function(id){
-  navigator.clipboard.writeText(id);
-  alert("ID da cotação copiado com sucesso!");
 }
 
 window.exportarRelatorio = async function(){
