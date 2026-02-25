@@ -1,74 +1,4 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fornecedor - São Raimundo</title>
-
-<style>
-body{
-  margin:0;
-  font-family:Arial, Helvetica, sans-serif;
-  background:#8B0000;
-  color:white;
-  text-align:center;
-}
-header{
-  background:#B22222;
-  padding:20px;
-  font-size:20px;
-  font-weight:bold;
-}
-.container{ padding:20px; }
-.card{
-  background:white;
-  color:black;
-  padding:15px;
-  margin:10px auto;
-  border-radius:10px;
-  max-width:500px;
-}
-input{
-  padding:8px;
-  margin-top:5px;
-}
-button{
-  padding:8px;
-  margin-top:5px;
-  background:#ff0000;
-  color:white;
-  border:none;
-  border-radius:6px;
-  cursor:pointer;
-}
-button:hover{
-  background:#cc0000;
-}
-#aviso{
-  background:#fff;
-  color:#000;
-  padding:15px;
-  margin:10px auto;
-  border-radius:10px;
-  max-width:500px;
-}
-</style>
-</head>
-
-<body>
-
-<header>
-São Raimundo Supermercado - Fornecedor
-</header>
-
-<div class="container">
-<h2 id="titulo"></h2>
-<div id="aviso" style="display:none;"></div>
-<div id="listaProdutos"></div>
-</div>
-
 <script type="module">
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { 
   getFirestore, 
@@ -91,10 +21,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-/* ============================= */
-/* 🔹 PEGAR ID DA URL */
-/* ============================= */
-
+/* 🔥 PEGAR ID DA URL */
 const urlParams = new URLSearchParams(window.location.search);
 const cotacaoId = urlParams.get("id");
 
@@ -104,7 +31,7 @@ const lista = document.getElementById("listaProdutos");
 
 if(!cotacaoId){
   aviso.style.display="block";
-  aviso.innerText="❌ Nenhuma cotação informada.";
+  aviso.innerText="❌ Link inválido.";
 } else {
 
   const cotacaoRef = doc(db,"cotacoes",cotacaoId);
@@ -136,18 +63,9 @@ if(!cotacaoId){
       return;
     }
 
-    /* ============================= */
     /* LISTAR PRODUTOS */
-    /* ============================= */
-
     onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), snapshot=>{
       lista.innerHTML="";
-
-      if(snapshot.empty){
-        aviso.style.display="block";
-        aviso.innerText="Nenhum produto cadastrado.";
-        return;
-      }
 
       snapshot.forEach(prodDoc=>{
         const p = prodDoc.data();
@@ -156,7 +74,6 @@ if(!cotacaoId){
           <div class="card">
             <b>${p.nome}</b><br>
             Qtd: ${p.quantidade} ${p.unidade}<br>
-
             <input type="number" placeholder="Seu preço" id="preco-${prodDoc.id}">
             <br>
             <button onclick="enviarPreco('${prodDoc.id}')">
@@ -169,15 +86,9 @@ if(!cotacaoId){
     });
 
   });
-
 }
 
-/* ============================= */
-/* ENVIAR PREÇO */
-/* ============================= */
-
 window.enviarPreco = async function(produtoId){
-
   const preco = document.getElementById("preco-"+produtoId).value;
   const fornecedor = prompt("Digite o nome da sua empresa:");
 
@@ -197,8 +108,4 @@ window.enviarPreco = async function(produtoId){
 
   alert("✅ Preço enviado com sucesso!");
 }
-
 </script>
-
-</body>
-</html>
