@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Produtos - São Raimundo</title>
+<title>Admin - São Raimundo Supermercado</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
@@ -18,11 +18,11 @@ body{
 header{
   background:#B22222;
   padding:20px;
-  font-size:20px;
+  font-size:22px;
   font-weight:bold;
 }
 .container{ padding:20px; }
-input, select, button{
+input,button,select{
   padding:10px;
   margin:5px;
   border-radius:8px;
@@ -40,7 +40,13 @@ button:hover{ background:#cc0000; }
   padding:15px;
   margin:10px auto;
   border-radius:10px;
-  max-width:400px;
+  max-width:500px;
+}
+.btn-secundario{
+  background:#444;
+}
+.btn-secundario:hover{
+  background:#222;
 }
 </style>
 </head>
@@ -48,38 +54,47 @@ button:hover{ background:#cc0000; }
 <body>
 
 <header>
-São Raimundo Supermercado - Produtos da Cotação
+São Raimundo Supermercado - ADMIN
 </header>
 
 <div class="container">
 
-<h2 id="titulo"></h2>
+<div id="login">
+  <h2>Login Administrador</h2>
+  <input type="password" id="senha" placeholder="Digite a senha">
+  <br>
+  <button onclick="entrar()">Entrar</button>
+</div>
 
-<input type="text" id="nomeProduto" placeholder="Nome do produto"><br>
+<div id="painel" style="display:none;">
 
-<select id="unidade">
-  <option value="kg">KG</option>
-  <option value="pc">PC</option>
-  <option value="un">UN</option>
-  <option value="cx">CX</option>
-</select><br>
+<h2>Criar Nova Cotação</h2>
+<input type="text" id="nomeCotacao" placeholder="Nome da cotação"><br>
 
-<input type="number" id="quantidade" placeholder="Quantidade"><br>
-<input type="text" id="observacao" placeholder="Observação (opcional)"><br>
+<label>Início:</label>
+<input type="datetime-local" id="inicioCotacao"><br>
 
-<button onclick="adicionarProduto()">Adicionar Produto</button>
-<button onclick="importarExcel()">Importar Excel</button>
-<button onclick="exportarExcel()">Exportar Excel</button>
+<label>Fim:</label>
+<input type="datetime-local" id="fimCotacao"><br>
 
-<h3>Lista de Produtos</h3>
-<div id="listaProdutos"></div>
+<button onclick="criarCotacao()">Criar Cotação</button>
 
-<br>
-<button onclick="voltar()">Voltar ao Admin</button>
+<hr>
 
+<h2>Lista de Cotações</h2>
+<div id="lista"></div>
+
+<hr>
+
+<h2>Exportar Relatório Final</h2>
+<select id="cotacaoExport"></select><br>
+<button onclick="exportarRelatorio()">Exportar Relatório Final</button>
+
+</div>
 </div>
 
 <script type="module">
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { 
   getFirestore, 
@@ -103,104 +118,152 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const cotacaoId = localStorage.getItem("cotacaoId");
-const cotacaoNome = localStorage.getItem("cotacaoNome");
-
-document.getElementById("titulo").innerText = "Cotação: " + cotacaoNome;
-
-const lista = document.getElementById("listaProdutos");
-
-if(!cotacaoId){
-  alert("Nenhuma cotação selecionada.");
-  window.location.href="admin.html";
+window.entrar = function(){
+  if(document.getElementById("senha").value === "1234"){
+    document.getElementById("login").style.display="none";
+    document.getElementById("painel").style.display="block";
+  } else {
+    alert("Senha incorreta!");
+  }
 }
 
-// ---------------- ADICIONAR ----------------
-window.adicionarProduto = async function(){
-  const nome = nomeProduto.value;
-  const unidade = unidade.value;
-  const quantidade = quantidade.value;
-  const observacao = observacao.value;
+window.criarCotacao = async function(){
+  const nome = nomeCotacao.value;
+  const inicio = inicioCotacao.value;
+  const fim = fimCotacao.value;
 
-  if(!nome || !quantidade) return alert("Digite nome e quantidade");
+  if(!nome || !inicio || !fim) return alert("Preencha todos os campos");
 
-  await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
-    nome, unidade, quantidade, observacao
+  await addDoc(collection(db,"cotacoes"),{
+    nome,
+    status:"aberta",
+    ativa:true,
+    inicio:new Date(inicio),
+    fim:new Date(fim),
+    dataCriacao:new Date()
   });
 
-  nomeProduto.value="";
-  quantidade.value="";
-  observacao.value="";
+  alert("Cotação criada!");
+  nomeCotacao.value="";
+  inicioCotacao.value="";
+  fimCotacao.value="";
 }
 
-// ---------------- LISTAR ----------------
-onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), (snapshot)=>{
+const lista = document.getElementById("lista");
+const selectExport = document.getElementById("cotacaoExport");
+
+onSnapshot(collection(db,"cotacoes"), snapshot=>{
   lista.innerHTML="";
-  snapshot.forEach((docSnap)=>{
+  selectExport.innerHTML="";
+
+  snapshot.forEach(docSnap=>{
     const data = docSnap.data();
+
+    const inicio = data.inicio?.seconds ? new Date(data.inicio.seconds*1000).toLocaleString() : "-";
+    const fim = data.fim?.seconds ? new Date(data.fim.seconds*1000).toLocaleString() : "-";
+
+    /* ============================= */
+    /* 🔥 LINK CORRIGIDO DEFINITIVO */
+    /* ============================= */
+
+    const basePath = window.location.href.substring(0, window.location.href.lastIndexOf("/") + 1);
+    const linkFornecedor = basePath + "fornecedor.html?id=" + docSnap.id;
+
     lista.innerHTML+=`
       <div class="card">
         <b>${data.nome}</b><br>
-        Qtd: ${data.quantidade} ${data.unidade}<br>
-        Obs: ${data.observacao || "-"}<br><br>
-        <button onclick="excluirProduto('${docSnap.id}')">Excluir</button>
+        <b>ID:</b> ${docSnap.id}<br>
+        Início: ${inicio}<br>
+        Fim: ${fim}<br><br>
+
+        <button onclick="abrir('${docSnap.id}','${data.nome}')">
+          Gerenciar Produtos
+        </button>
+
+        <button class="btn-secundario" onclick="copiarLink('${linkFornecedor}')">
+          Copiar Link do Fornecedor
+        </button>
+
+        <br><br>
+
+        <button onclick="excluir('${docSnap.id}')">Excluir</button>
       </div>
     `;
+
+    selectExport.innerHTML+=`<option value="${docSnap.id}">${data.nome}</option>`;
   });
 });
 
-window.excluirProduto = async function(id){
-  await deleteDoc(doc(db,"cotacoes",cotacaoId,"produtos",id));
+window.copiarLink = function(link){
+  navigator.clipboard.writeText(link);
+  alert("Link do fornecedor copiado com sucesso!");
 }
 
-window.voltar = function(){
-  window.location.href="admin.html";
+window.excluir = async id=>{
+  await deleteDoc(doc(db,"cotacoes",id));
 }
 
-// ---------------- IMPORTAR EXCEL ----------------
-window.importarExcel = function(){
-  const input = document.createElement("input");
-  input.type = "file";
-  input.accept = ".xlsx,.xls";
-  input.onchange = async e => {
-    const file = e.target.files[0];
-    const data = await file.arrayBuffer();
-    const workbook = XLSX.read(data);
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json(sheet);
+window.abrir = (id,nome)=>{
+  localStorage.setItem("cotacaoId",id);
+  localStorage.setItem("cotacaoNome",nome);
+  window.location.href="produtos.html";
+}
 
-    for(const linha of json){
-      if(linha.nome && linha.quantidade){
-        await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
-          nome: linha.nome,
-          quantidade: linha.quantidade,
-          unidade: (linha.unidade || "kg").toLowerCase(),
-          observacao: linha.observacao || ""
-        });
-      }
+window.exportarRelatorio = async function(){
+
+  const cotacaoId = selectExport.value;
+  const cotacaoSnap = await getDocs(collection(db,"cotacoes"));
+  let cotacaoData;
+
+  cotacaoSnap.forEach(d=>{
+    if(d.id===cotacaoId){
+      cotacaoData=d.data();
     }
+  });
 
-    alert("Importação concluída!");
-  };
-  input.click();
-}
+  const agora = new Date();
+  const fim = new Date(cotacaoData.fim.seconds*1000);
 
-// ---------------- EXPORTAR EXCEL ----------------
-window.exportarExcel = async function(){
-  const snapshot = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
-  const produtos = snapshot.docs.map(doc=>doc.data());
-
-  if(produtos.length===0){
-    alert("Nenhum produto cadastrado.");
+  if(agora < fim){
+    alert("⏳ Cotação ainda está ativa.");
     return;
   }
 
-  const ws = XLSX.utils.json_to_sheet(produtos);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Produtos");
-  XLSX.writeFile(wb, `Produtos-${cotacaoNome}.xlsx`);
-}
-</script>
+  const produtosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
 
+  let relatorio=[];
+
+  for(const produtoDoc of produtosSnap.docs){
+
+    const produto = produtoDoc.data();
+    const precosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos",produtoDoc.id,"precos"));
+
+    let menorPreco=null;
+    let vencedor="";
+
+    precosSnap.forEach(p=>{
+      const valor=parseFloat(p.data().preco);
+      if(menorPreco===null || valor<menorPreco){
+        menorPreco=valor;
+        vencedor=p.data().fornecedor;
+      }
+    });
+
+    relatorio.push({
+      Produto: produto.nome,
+      Quantidade: produto.quantidade,
+      Unidade: produto.unidade,
+      "Menor Preço": menorPreco ?? "Sem lance",
+      "Fornecedor Vencedor": vencedor || "-"
+    });
+  }
+
+  const ws = XLSX.utils.json_to_sheet(relatorio);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Relatório Final");
+  XLSX.writeFile(wb, "Relatorio_Final_Cotacao.xlsx");
+}
+
+</script>
 </body>
 </html>
