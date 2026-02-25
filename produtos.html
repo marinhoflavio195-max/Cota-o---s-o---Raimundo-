@@ -1,100 +1,4 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin - São Raimundo Supermercado</title>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-<style>
-body{
-  margin:0;
-  font-family:Arial, Helvetica, sans-serif;
-  background:#8B0000;
-  color:white;
-  text-align:center;
-}
-header{
-  background:#B22222;
-  padding:20px;
-  font-size:22px;
-  font-weight:bold;
-}
-.container{ padding:20px; }
-input,button,select{
-  padding:10px;
-  margin:5px;
-  border-radius:8px;
-  border:none;
-}
-button{
-  background:#ff0000;
-  color:white;
-  cursor:pointer;
-}
-button:hover{ background:#cc0000; }
-.card{
-  background:white;
-  color:black;
-  padding:15px;
-  margin:10px auto;
-  border-radius:10px;
-  max-width:500px;
-}
-.btn-secundario{
-  background:#444;
-}
-.btn-secundario:hover{
-  background:#222;
-}
-</style>
-</head>
-
-<body>
-
-<header>
-São Raimundo Supermercado - ADMIN
-</header>
-
-<div class="container">
-
-<div id="login">
-  <h2>Login Administrador</h2>
-  <input type="password" id="senha" placeholder="Digite a senha">
-  <br>
-  <button onclick="entrar()">Entrar</button>
-</div>
-
-<div id="painel" style="display:none;">
-
-<h2>Criar Nova Cotação</h2>
-<input type="text" id="nomeCotacao" placeholder="Nome da cotação"><br>
-
-<label>Início:</label>
-<input type="datetime-local" id="inicioCotacao"><br>
-
-<label>Fim:</label>
-<input type="datetime-local" id="fimCotacao"><br>
-
-<button onclick="criarCotacao()">Criar Cotação</button>
-
-<hr>
-
-<h2>Lista de Cotações</h2>
-<div id="lista"></div>
-
-<hr>
-
-<h2>Exportar Relatório Final</h2>
-<select id="cotacaoExport"></select><br>
-<button onclick="exportarRelatorio()">Exportar Relatório Final</button>
-
-</div>
-</div>
-
 <script type="module">
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { 
   getFirestore, 
@@ -118,152 +22,59 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-window.entrar = function(){
-  if(document.getElementById("senha").value === "1234"){
-    document.getElementById("login").style.display="none";
-    document.getElementById("painel").style.display="block";
-  } else {
-    alert("Senha incorreta!");
-  }
+const cotacaoId = localStorage.getItem("cotacaoId");
+const cotacaoNome = localStorage.getItem("cotacaoNome");
+
+if(!cotacaoId){
+  alert("Nenhuma cotação selecionada.");
+  window.location.href="admin.html";
 }
 
-window.criarCotacao = async function(){
-  const nome = nomeCotacao.value;
-  const inicio = inicioCotacao.value;
-  const fim = fimCotacao.value;
+document.getElementById("titulo").innerText = "Cotação: " + cotacaoNome;
 
-  if(!nome || !inicio || !fim) return alert("Preencha todos os campos");
+const lista = document.getElementById("listaProdutos");
 
-  await addDoc(collection(db,"cotacoes"),{
-    nome,
-    status:"aberta",
-    ativa:true,
-    inicio:new Date(inicio),
-    fim:new Date(fim),
-    dataCriacao:new Date()
+/* ADICIONAR PRODUTO */
+window.adicionarProduto = async function(){
+  const nome = nomeProduto.value;
+  const unidade = unidade.value;
+  const quantidade = quantidade.value;
+  const observacao = observacao.value;
+
+  if(!nome || !quantidade) return alert("Digite nome e quantidade");
+
+  await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+    nome, unidade, quantidade, observacao
   });
 
-  alert("Cotação criada!");
-  nomeCotacao.value="";
-  inicioCotacao.value="";
-  fimCotacao.value="";
+  nomeProduto.value="";
+  quantidade.value="";
+  observacao.value="";
 }
 
-const lista = document.getElementById("lista");
-const selectExport = document.getElementById("cotacaoExport");
-
-onSnapshot(collection(db,"cotacoes"), snapshot=>{
+/* LISTAR */
+onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), (snapshot)=>{
   lista.innerHTML="";
-  selectExport.innerHTML="";
-
-  snapshot.forEach(docSnap=>{
+  snapshot.forEach((docSnap)=>{
     const data = docSnap.data();
-
-    const inicio = data.inicio?.seconds ? new Date(data.inicio.seconds*1000).toLocaleString() : "-";
-    const fim = data.fim?.seconds ? new Date(data.fim.seconds*1000).toLocaleString() : "-";
-
-    /* ============================= */
-    /* 🔥 LINK CORRIGIDO DEFINITIVO */
-    /* ============================= */
-
-    const basePath = window.location.href.substring(0, window.location.href.lastIndexOf("/") + 1);
-    const linkFornecedor = basePath + "fornecedor.html?id=" + docSnap.id;
-
     lista.innerHTML+=`
       <div class="card">
         <b>${data.nome}</b><br>
-        <b>ID:</b> ${docSnap.id}<br>
-        Início: ${inicio}<br>
-        Fim: ${fim}<br><br>
-
-        <button onclick="abrir('${docSnap.id}','${data.nome}')">
-          Gerenciar Produtos
+        Qtd: ${data.quantidade} ${data.unidade}<br>
+        Obs: ${data.observacao || "-"}<br><br>
+        <button onclick="excluirProduto('${docSnap.id}')">
+          Excluir
         </button>
-
-        <button class="btn-secundario" onclick="copiarLink('${linkFornecedor}')">
-          Copiar Link do Fornecedor
-        </button>
-
-        <br><br>
-
-        <button onclick="excluir('${docSnap.id}')">Excluir</button>
       </div>
     `;
-
-    selectExport.innerHTML+=`<option value="${docSnap.id}">${data.nome}</option>`;
   });
 });
 
-window.copiarLink = function(link){
-  navigator.clipboard.writeText(link);
-  alert("Link do fornecedor copiado com sucesso!");
+window.excluirProduto = async function(id){
+  await deleteDoc(doc(db,"cotacoes",cotacaoId,"produtos",id));
 }
 
-window.excluir = async id=>{
-  await deleteDoc(doc(db,"cotacoes",id));
+window.voltar = function(){
+  window.location.href="admin.html";
 }
-
-window.abrir = (id,nome)=>{
-  localStorage.setItem("cotacaoId",id);
-  localStorage.setItem("cotacaoNome",nome);
-  window.location.href="produtos.html";
-}
-
-window.exportarRelatorio = async function(){
-
-  const cotacaoId = selectExport.value;
-  const cotacaoSnap = await getDocs(collection(db,"cotacoes"));
-  let cotacaoData;
-
-  cotacaoSnap.forEach(d=>{
-    if(d.id===cotacaoId){
-      cotacaoData=d.data();
-    }
-  });
-
-  const agora = new Date();
-  const fim = new Date(cotacaoData.fim.seconds*1000);
-
-  if(agora < fim){
-    alert("⏳ Cotação ainda está ativa.");
-    return;
-  }
-
-  const produtosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
-
-  let relatorio=[];
-
-  for(const produtoDoc of produtosSnap.docs){
-
-    const produto = produtoDoc.data();
-    const precosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos",produtoDoc.id,"precos"));
-
-    let menorPreco=null;
-    let vencedor="";
-
-    precosSnap.forEach(p=>{
-      const valor=parseFloat(p.data().preco);
-      if(menorPreco===null || valor<menorPreco){
-        menorPreco=valor;
-        vencedor=p.data().fornecedor;
-      }
-    });
-
-    relatorio.push({
-      Produto: produto.nome,
-      Quantidade: produto.quantidade,
-      Unidade: produto.unidade,
-      "Menor Preço": menorPreco ?? "Sem lance",
-      "Fornecedor Vencedor": vencedor || "-"
-    });
-  }
-
-  const ws = XLSX.utils.json_to_sheet(relatorio);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Relatório Final");
-  XLSX.writeFile(wb, "Relatorio_Final_Cotacao.xlsx");
-}
-
 </script>
-</body>
-</html>
