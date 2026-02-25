@@ -162,8 +162,10 @@ onSnapshot(collection(db,"cotacoes"), snapshot=>{
     const inicio = data.inicio?.seconds ? new Date(data.inicio.seconds*1000).toLocaleString() : "-";
     const fim = data.fim?.seconds ? new Date(data.fim.seconds*1000).toLocaleString() : "-";
 
-    const linkFornecedor = window.location.origin +
-      "/fornecedor.html?id=" + docSnap.id;
+    // ✅ CORREÇÃO DO LINK PARA GITHUB PAGES
+    const basePath = window.location.pathname.replace("admin.html","");
+    const linkFornecedor = window.location.origin + basePath + 
+      "fornecedor.html?id=" + docSnap.id;
 
     lista.innerHTML+=`
       <div class="card">
