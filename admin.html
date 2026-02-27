@@ -51,6 +51,9 @@ button:hover{ background:#cc0000; }
   border-radius:10px;
   max-width:500px;
 }
+.status{
+  font-weight:bold;
+}
 </style>
 </head>
 
@@ -116,7 +119,8 @@ import {
   doc, 
   onSnapshot,
   getDoc,
-  getDocs
+  getDocs,
+  updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -154,6 +158,7 @@ window.criarCotacao = async function(){
     nome,
     inicio:new Date(inicio),
     fim:new Date(fim),
+    status:"ativa",
     dataCriacao:new Date()
   });
 
@@ -177,12 +182,19 @@ onSnapshot(collection(db,"cotacoes"), snapshot=>{
 
     const inicio = data.inicio?.toDate ? data.inicio.toDate().toLocaleString() : "-";
     const fim = data.fim?.toDate ? data.fim.toDate().toLocaleString() : "-";
+    const status = data.status || "ativa";
 
     lista.innerHTML+=`
       <div class="card">
         <b>${data.nome}</b><br>
         Início: ${inicio}<br>
-        Fim: ${fim}<br><br>
+        Fim: ${fim}<br>
+        Status: <span class="status">${status.toUpperCase()}</span><br><br>
+
+        <button onclick="ativar('${docSnap.id}')">Ativar</button>
+        <button onclick="desativar('${docSnap.id}')">Desativar</button>
+        <button onclick="encerrar('${docSnap.id}')">Encerrar</button>
+        <br><br>
 
         <button onclick="copiarLink('${docSnap.id}')">
           Copiar Link Fornecedor
@@ -199,6 +211,18 @@ onSnapshot(collection(db,"cotacoes"), snapshot=>{
   });
 });
 
+window.ativar = async function(id){
+  await updateDoc(doc(db,"cotacoes",id),{ status:"ativa" });
+}
+
+window.desativar = async function(id){
+  await updateDoc(doc(db,"cotacoes",id),{ status:"desativada" });
+}
+
+window.encerrar = async function(id){
+  await updateDoc(doc(db,"cotacoes",id),{ status:"encerrada" });
+}
+
 window.copiarLink = function(id){
   const base = window.location.href.replace("admin.html","");
   const link = base + "fornecedor.html?id=" + id;
@@ -209,83 +233,6 @@ window.copiarLink = function(id){
 window.excluir = async id=>{
   await deleteDoc(doc(db,"cotacoes",id));
 }
-
-window.importarExcel = async function(){
-
-  const cotacaoId = selectImport.value;
-  const file = document.getElementById("arquivoExcel").files[0];
-
-  if(!cotacaoId) return alert("Selecione a cotação");
-  if(!file) return alert("Selecione o arquivo");
-
-  const reader = new FileReader();
-
-  reader.onload = async function(e){
-
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data,{type:"array"});
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json(sheet);
-
-    for(const item of json){
-      await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
-        nome: item.nome || item.Nome,
-        quantidade: item.quantidade || item.Quantidade,
-        unidade: item.unidade || item.Unidade
-      });
-    }
-
-    alert("Produtos importados com sucesso!");
-  };
-
-  reader.readAsArrayBuffer(file);
-}
-
-window.exportarRelatorio = async function(){
-
-  const cotacaoId = selectExport.value;
-  const cotacaoSnap = await getDoc(doc(db,"cotacoes",cotacaoId));
-  const fim = cotacaoSnap.data().fim.toDate();
-
-  if(new Date() < fim){
-    alert("Cotação ainda ativa.");
-    return;
-  }
-
-  const produtosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
-  let relatorio=[];
-
-  for(const produtoDoc of produtosSnap.docs){
-
-    const produto = produtoDoc.data();
-    const precosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos",produtoDoc.id,"precos"));
-
-    let menor=null;
-    let vencedor="-";
-
-    precosSnap.forEach(p=>{
-      const valor=parseFloat(p.data().preco);
-      if(menor===null || valor<menor){
-        menor=valor;
-        vencedor=p.data().fornecedor;
-      }
-    });
-
-    relatorio.push({
-      Produto: produto.nome,
-      Quantidade: produto.quantidade,
-      Unidade: produto.unidade,
-      "Menor Preço": menor ?? "Sem lance",
-      Fornecedor: vencedor
-    });
-  }
-
-  const ws = XLSX.utils.json_to_sheet(relatorio);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Relatório Final");
-  XLSX.writeFile(wb, "Relatorio_Final.xlsx");
-}
-
 </script>
 </body>
 </html>
