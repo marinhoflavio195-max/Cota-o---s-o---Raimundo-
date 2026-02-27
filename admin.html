@@ -15,25 +15,34 @@ body{
   color:white;
   text-align:center;
 }
+
 header{
   background:#B22222;
   padding:20px;
-  font-size:22px;
-  font-weight:bold;
 }
+
+header img{
+  width:180px;
+  margin-bottom:10px;
+}
+
 .container{ padding:20px; }
+
 input,button,select{
   padding:10px;
   margin:5px;
   border-radius:8px;
   border:none;
 }
+
 button{
   background:#ff0000;
   color:white;
   cursor:pointer;
 }
+
 button:hover{ background:#cc0000; }
+
 .card{
   background:white;
   color:black;
@@ -48,7 +57,8 @@ button:hover{ background:#cc0000; }
 <body>
 
 <header>
-São Raimundo Supermercado - ADMIN
+  <img src="logo.png">
+  <h2>PAINEL ADMINISTRATIVO</h2>
 </header>
 
 <div class="container">
@@ -80,9 +90,17 @@ São Raimundo Supermercado - ADMIN
 
 <hr>
 
+<h2>Importar Produtos via Excel</h2>
+
+<select id="cotacaoImport"></select><br>
+<input type="file" id="arquivoExcel" accept=".xlsx,.xls"><br>
+<button onclick="importarExcel()">Importar Produtos</button>
+
+<hr>
+
 <h2>Exportar Relatório Final</h2>
 <select id="cotacaoExport"></select><br>
-<button onclick="exportarRelatorio()">Exportar Relatório Final</button>
+<button onclick="exportarRelatorio()">Exportar Relatório</button>
 
 </div>
 </div>
@@ -90,8 +108,16 @@ São Raimundo Supermercado - ADMIN
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, getDoc, getDocs } 
-from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot,
+  getDoc,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "SUA_API_KEY",
@@ -107,8 +133,8 @@ const db = getFirestore(app);
 
 window.entrar = function(){
   if(document.getElementById("senha").value === "1234"){
-    login.style.display="none";
-    painel.style.display="block";
+    document.getElementById("login").style.display="none";
+    document.getElementById("painel").style.display="block";
   } else {
     alert("Senha incorreta!");
   }
@@ -119,7 +145,10 @@ window.criarCotacao = async function(){
   const inicio = inicioCotacao.value;
   const fim = fimCotacao.value;
 
-  if(!nome || !inicio || !fim) return alert("Preencha todos os campos");
+  if(!nome || !inicio || !fim){
+    alert("Preencha todos os campos");
+    return;
+  }
 
   await addDoc(collection(db,"cotacoes"),{
     nome,
@@ -128,7 +157,7 @@ window.criarCotacao = async function(){
     dataCriacao:new Date()
   });
 
-  alert("Cotação criada!");
+  alert("Cotação criada com sucesso!");
   nomeCotacao.value="";
   inicioCotacao.value="";
   fimCotacao.value="";
@@ -136,10 +165,12 @@ window.criarCotacao = async function(){
 
 const lista = document.getElementById("lista");
 const selectExport = document.getElementById("cotacaoExport");
+const selectImport = document.getElementById("cotacaoImport");
 
 onSnapshot(collection(db,"cotacoes"), snapshot=>{
   lista.innerHTML="";
   selectExport.innerHTML="";
+  selectImport.innerHTML="";
 
   snapshot.forEach(docSnap=>{
     const data = docSnap.data();
@@ -153,10 +184,6 @@ onSnapshot(collection(db,"cotacoes"), snapshot=>{
         Início: ${inicio}<br>
         Fim: ${fim}<br><br>
 
-        <button onclick="abrir('${docSnap.id}','${data.nome}')">
-          Gerenciar Produtos
-        </button>
-
         <button onclick="copiarLink('${docSnap.id}')">
           Copiar Link Fornecedor
         </button>
@@ -168,6 +195,7 @@ onSnapshot(collection(db,"cotacoes"), snapshot=>{
     `;
 
     selectExport.innerHTML+=`<option value="${docSnap.id}">${data.nome}</option>`;
+    selectImport.innerHTML+=`<option value="${docSnap.id}">${data.nome}</option>`;
   });
 });
 
@@ -182,28 +210,53 @@ window.excluir = async id=>{
   await deleteDoc(doc(db,"cotacoes",id));
 }
 
-window.abrir = (id,nome)=>{
-  localStorage.setItem("cotacaoId",id);
-  localStorage.setItem("cotacaoNome",nome);
-  window.location.href="produtos.html";
+window.importarExcel = async function(){
+
+  const cotacaoId = selectImport.value;
+  const file = document.getElementById("arquivoExcel").files[0];
+
+  if(!cotacaoId) return alert("Selecione a cotação");
+  if(!file) return alert("Selecione o arquivo");
+
+  const reader = new FileReader();
+
+  reader.onload = async function(e){
+
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data,{type:"array"});
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(sheet);
+
+    for(const item of json){
+      await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+        nome: item.nome || item.Nome,
+        quantidade: item.quantidade || item.Quantidade,
+        unidade: item.unidade || item.Unidade
+      });
+    }
+
+    alert("Produtos importados com sucesso!");
+  };
+
+  reader.readAsArrayBuffer(file);
 }
 
 window.exportarRelatorio = async function(){
-  const cotacaoId = selectExport.value;
-  const cotacaoRef = doc(db,"cotacoes",cotacaoId);
-  const cotacaoSnap = await getDoc(cotacaoRef);
 
+  const cotacaoId = selectExport.value;
+  const cotacaoSnap = await getDoc(doc(db,"cotacoes",cotacaoId));
   const fim = cotacaoSnap.data().fim.toDate();
+
   if(new Date() < fim){
     alert("Cotação ainda ativa.");
     return;
   }
 
   const produtosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
-
   let relatorio=[];
 
   for(const produtoDoc of produtosSnap.docs){
+
     const produto = produtoDoc.data();
     const precosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos",produtoDoc.id,"precos"));
 
@@ -223,13 +276,13 @@ window.exportarRelatorio = async function(){
       Quantidade: produto.quantidade,
       Unidade: produto.unidade,
       "Menor Preço": menor ?? "Sem lance",
-      "Fornecedor": vencedor
+      Fornecedor: vencedor
     });
   }
 
   const ws = XLSX.utils.json_to_sheet(relatorio);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Relatório");
+  XLSX.utils.book_append_sheet(wb, ws, "Relatório Final");
   XLSX.writeFile(wb, "Relatorio_Final.xlsx");
 }
 
