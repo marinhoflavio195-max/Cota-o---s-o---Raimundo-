@@ -39,6 +39,10 @@ button{
   color:white;
   border:none;
   border-radius:6px;
+  cursor:pointer;
+}
+button:hover{
+  background:#cc0000;
 }
 #aviso{
   background:#fff;
@@ -79,8 +83,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const cotacaoId = localStorage.getItem("cotacaoId");
-const cotacaoNome = localStorage.getItem("cotacaoNome");
+/* 🔥 PEGAR ID PELA URL */
+const urlParams = new URLSearchParams(window.location.search);
+const cotacaoId = urlParams.get("id");
 
 const titulo = document.getElementById("titulo");
 const aviso = document.getElementById("aviso");
@@ -88,21 +93,21 @@ const lista = document.getElementById("listaProdutos");
 
 if(!cotacaoId){
   aviso.style.display="block";
-  aviso.innerText="Nenhuma cotação informada.";
+  aviso.innerText="❌ Link inválido.";
 } else {
-
-  titulo.innerText="Cotação: "+cotacaoNome;
 
   const cotacaoRef = doc(db,"cotacoes",cotacaoId);
 
   getDoc(cotacaoRef).then(docSnap=>{
     if(!docSnap.exists()){
       aviso.style.display="block";
-      aviso.innerText="Cotação não encontrada.";
+      aviso.innerText="❌ Cotação não encontrada.";
       return;
     }
 
     const data = docSnap.data();
+    titulo.innerText="Cotação: "+data.nome;
+
     const agora = new Date();
     const inicio = data.inicio.toDate();
     const fim = data.fim.toDate();
@@ -119,7 +124,6 @@ if(!cotacaoId){
       return;
     }
 
-    // LISTAR PRODUTOS
     onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), snapshot=>{
       lista.innerHTML="";
       snapshot.forEach(prodDoc=>{
@@ -130,7 +134,9 @@ if(!cotacaoId){
             Qtd: ${p.quantidade} ${p.unidade}<br>
             <input type="number" placeholder="Seu preço" id="preco-${prodDoc.id}">
             <br>
-            <button onclick="enviarPreco('${prodDoc.id}')">Enviar Preço</button>
+            <button onclick="enviarPreco('${prodDoc.id}')">
+              Enviar Preço
+            </button>
           </div>
         `;
       });
@@ -143,15 +149,18 @@ window.enviarPreco = async function(produtoId){
   const preco = document.getElementById("preco-"+produtoId).value;
   const fornecedor = prompt("Digite o nome da sua empresa:");
 
-  if(!preco || !fornecedor) return alert("Preencha os dados");
+  if(!preco || !fornecedor){
+    alert("Preencha todos os dados.");
+    return;
+  }
 
   await addDoc(collection(db,"cotacoes",cotacaoId,"produtos",produtoId,"precos"),{
-    preco,
+    preco: parseFloat(preco),
     fornecedor,
     data:new Date()
   });
 
-  alert("Preço enviado com sucesso!");
+  alert("✅ Preço enviado com sucesso!");
 }
 </script>
 
