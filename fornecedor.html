@@ -8,7 +8,7 @@
 <style>
 body{
   margin:0;
-  font-family:Arial, Helvetica, sans-serif;
+  font-family:Arial;
   background:#8B0000;
   color:white;
   text-align:center;
@@ -20,37 +20,28 @@ header{
   font-weight:bold;
 }
 .container{ padding:20px; }
+
+input,button{
+  padding:10px;
+  margin:5px;
+  border-radius:8px;
+  border:none;
+}
+
+button{
+  background:#ff0000;
+  color:white;
+  cursor:pointer;
+}
+button:hover{ background:#cc0000; }
+
 .card{
   background:white;
   color:black;
-  padding:15px;
+  padding:10px;
   margin:10px auto;
   border-radius:10px;
-  max-width:500px;
-}
-input{
-  padding:8px;
-  margin-top:5px;
-}
-button{
-  padding:8px;
-  margin-top:5px;
-  background:#ff0000;
-  color:white;
-  border:none;
-  border-radius:6px;
-  cursor:pointer;
-}
-button:hover{
-  background:#cc0000;
-}
-#aviso{
-  background:#fff;
-  color:#000;
-  padding:15px;
-  margin:10px auto;
-  border-radius:10px;
-  max-width:500px;
+  max-width:400px;
 }
 </style>
 </head>
@@ -62,14 +53,20 @@ São Raimundo Supermercado - Fornecedor
 </header>
 
 <div class="container">
-<h2 id="titulo"></h2>
-<div id="aviso" style="display:none;"></div>
+
+<h3 id="nomeCotacao"></h3>
+
+<input type="text" id="nomeFornecedor" placeholder="Seu nome ou empresa"><br>
+
 <div id="listaProdutos"></div>
+
 </div>
 
 <script type="module">
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, getDoc, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, doc, getDoc, onSnapshot } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "SUA_API_KEY",
@@ -83,86 +80,49 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-/* 🔥 PEGAR ID PELA URL */
-const urlParams = new URLSearchParams(window.location.search);
-const cotacaoId = urlParams.get("id");
-
-const titulo = document.getElementById("titulo");
-const aviso = document.getElementById("aviso");
-const lista = document.getElementById("listaProdutos");
+const params = new URLSearchParams(window.location.search);
+const cotacaoId = params.get("id");
 
 if(!cotacaoId){
-  aviso.style.display="block";
-  aviso.innerText="❌ Link inválido.";
-} else {
-
-  const cotacaoRef = doc(db,"cotacoes",cotacaoId);
-
-  getDoc(cotacaoRef).then(docSnap=>{
-    if(!docSnap.exists()){
-      aviso.style.display="block";
-      aviso.innerText="❌ Cotação não encontrada.";
-      return;
-    }
-
-    const data = docSnap.data();
-    titulo.innerText="Cotação: "+data.nome;
-
-    const agora = new Date();
-    const inicio = data.inicio.toDate();
-    const fim = data.fim.toDate();
-
-    if(agora < inicio){
-      aviso.style.display="block";
-      aviso.innerText="⏳ Cotação ainda não começou.";
-      return;
-    }
-
-    if(agora > fim){
-      aviso.style.display="block";
-      aviso.innerText="⛔ Cotação encerrada.";
-      return;
-    }
-
-    onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), snapshot=>{
-      lista.innerHTML="";
-      snapshot.forEach(prodDoc=>{
-        const p = prodDoc.data();
-        lista.innerHTML+=`
-          <div class="card">
-            <b>${p.nome}</b><br>
-            Qtd: ${p.quantidade} ${p.unidade}<br>
-            <input type="number" placeholder="Seu preço" id="preco-${prodDoc.id}">
-            <br>
-            <button onclick="enviarPreco('${prodDoc.id}')">
-              Enviar Preço
-            </button>
-          </div>
-        `;
-      });
-    });
-
-  });
+  document.body.innerHTML="<h2>Link inválido</h2>";
 }
 
-window.enviarPreco = async function(produtoId){
-  const preco = document.getElementById("preco-"+produtoId).value;
-  const fornecedor = prompt("Digite o nome da sua empresa:");
+const cotacaoRef = doc(db,"cotacoes",cotacaoId);
+const cotacaoSnap = await getDoc(cotacaoRef);
 
-  if(!preco || !fornecedor){
-    alert("Preencha todos os dados.");
-    return;
-  }
+document.getElementById("nomeCotacao").innerText = cotacaoSnap.data().nome;
+
+const lista = document.getElementById("listaProdutos");
+
+onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), snapshot=>{
+  lista.innerHTML="";
+  snapshot.forEach(docSnap=>{
+    const data = docSnap.data();
+    lista.innerHTML+=`
+      <div class="card">
+        <b>${data.nome}</b><br>
+        ${data.quantidade} ${data.unidade}<br><br>
+        <input type="number" id="preco_${docSnap.id}" placeholder="Seu preço"><br>
+        <button onclick="enviar('${docSnap.id}')">Enviar Preço</button>
+      </div>
+    `;
+  });
+});
+
+window.enviar = async function(produtoId){
+  const fornecedor = nomeFornecedor.value;
+  const preco = document.getElementById("preco_"+produtoId).value;
+
+  if(!fornecedor || !preco) return alert("Preencha seu nome e o preço");
 
   await addDoc(collection(db,"cotacoes",cotacaoId,"produtos",produtoId,"precos"),{
-    preco: parseFloat(preco),
     fornecedor,
-    data:new Date()
+    preco
   });
 
-  alert("✅ Preço enviado com sucesso!");
+  alert("Preço enviado!");
 }
-</script>
 
+</script>
 </body>
 </html>
