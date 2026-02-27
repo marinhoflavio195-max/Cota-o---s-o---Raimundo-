@@ -1,15 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Produtos da Cotação</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial, Helvetica, sans-serif;
+  background:#8B0000;
+  color:white;
+  text-align:center;
+}
+
+header{
+  background:#B22222;
+  padding:20px;
+  font-size:22px;
+  font-weight:bold;
+}
+
+.container{
+  padding:20px;
+}
+
+input,select,button{
+  padding:10px;
+  margin:5px;
+  border-radius:8px;
+  border:none;
+}
+
+button{
+  background:#ff0000;
+  color:white;
+  cursor:pointer;
+}
+
+button:hover{
+  background:#cc0000;
+}
+
+.card{
+  background:white;
+  color:black;
+  padding:15px;
+  margin:10px auto;
+  border-radius:10px;
+  max-width:500px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+Produtos da Cotação
+</header>
+
+<div class="container">
+
+<h3 id="tituloCotacao"></h3>
+
+<input type="text" id="nomeProduto" placeholder="Nome do produto">
+<input type="number" id="quantidade" placeholder="Quantidade">
+
+<select id="unidade">
+  <option value="KG">KG</option>
+  <option value="UND">UND</option>
+  <option value="PC">PC</option>
+  <option value="CX">CX</option>
+</select>
+
+<input type="text" id="observacao" placeholder="Observação">
+
+<br>
+<button onclick="adicionarProduto()">Adicionar Produto</button>
+
+<hr>
+
+<h3>Importar via Excel</h3>
+<input type="file" id="arquivoExcel" accept=".xlsx">
+<button onclick="importarExcel()">Importar</button>
+
+<br><br>
+<button onclick="exportarExcel()">Exportar para Excel</button>
+
+<hr>
+
+<div id="listaProdutos"></div>
+
+<br>
+<button onclick="voltar()">Voltar</button>
+
+</div>
+
 <script type="module">
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  deleteDoc, 
-  doc, 
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  deleteDoc,
+  doc,
   onSnapshot,
   getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
+/* 🔴 FIREBASE OFICIAL */
 const firebaseConfig = {
   apiKey: "SUA_API_KEY",
   authDomain: "cotacao-sao-raimundo-oficial.firebaseapp.com",
@@ -30,38 +132,50 @@ if(!cotacaoId){
   window.location.href="admin.html";
 }
 
-document.getElementById("titulo").innerText = "Cotação: " + cotacaoNome;
+document.getElementById("tituloCotacao").innerText =
+  "Cotação: " + cotacaoNome;
 
 const lista = document.getElementById("listaProdutos");
 
-/* ADICIONAR PRODUTO */
-window.adicionarProduto = async function(){
-  const nome = nomeProduto.value;
-  const unidade = unidade.value;
-  const quantidade = quantidade.value;
-  const observacao = observacao.value;
+/* ================= ADICIONAR ================= */
 
-  if(!nome || !quantidade) return alert("Digite nome e quantidade");
+window.adicionarProduto = async function(){
+
+  const nome = document.getElementById("nomeProduto").value;
+  const quantidade = document.getElementById("quantidade").value;
+  const unidade = document.getElementById("unidade").value;
+  const observacao = document.getElementById("observacao").value;
+
+  if(!nome || !quantidade){
+    alert("Preencha os campos obrigatórios");
+    return;
+  }
 
   await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
-    nome, unidade, quantidade, observacao
+    nome,
+    quantidade: parseFloat(quantidade),
+    unidade,
+    observacao
   });
 
-  nomeProduto.value="";
-  quantidade.value="";
-  observacao.value="";
+  document.getElementById("nomeProduto").value="";
+  document.getElementById("quantidade").value="";
+  document.getElementById("observacao").value="";
 }
 
-/* LISTAR */
-onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), (snapshot)=>{
+/* ================= LISTAR ================= */
+
+onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"),(snapshot)=>{
   lista.innerHTML="";
   snapshot.forEach((docSnap)=>{
     const data = docSnap.data();
+
     lista.innerHTML+=`
       <div class="card">
         <b>${data.nome}</b><br>
-        Qtd: ${data.quantidade} ${data.unidade}<br>
-        Obs: ${data.observacao || "-"}<br><br>
+        ${data.quantidade} ${data.unidade}<br>
+        ${data.observacao || ""}
+        <br><br>
         <button onclick="excluirProduto('${docSnap.id}')">
           Excluir
         </button>
@@ -70,11 +184,97 @@ onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), (snapshot)=>{
   });
 });
 
+/* ================= EXCLUIR ================= */
+
 window.excluirProduto = async function(id){
   await deleteDoc(doc(db,"cotacoes",cotacaoId,"produtos",id));
 }
 
+/* ================= IMPORTAR EXCEL ================= */
+
+window.importarExcel = function(){
+
+  const arquivo = document.getElementById("arquivoExcel").files[0];
+  if(!arquivo){
+    alert("Selecione o arquivo");
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onload = async function(e){
+
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data,{type:"array"});
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+    const rows = XLSX.utils.sheet_to_json(sheet,{
+      header:1,
+      defval:""
+    });
+
+    let contador = 0;
+
+    for(let i=1; i<rows.length; i++){
+
+      const linha = rows[i];
+
+      const nome = linha[0]?.toString().trim();
+      const quantidade = linha[1]?.toString().replace(",",".");
+      const unidade = linha[2]?.toString().trim();
+      const observacao = linha[3]?.toString().trim() || "";
+
+      if(!nome) continue;
+
+      await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+        nome,
+        quantidade: parseFloat(quantidade) || 0,
+        unidade,
+        observacao
+      });
+
+      contador++;
+    }
+
+    alert(contador + " produtos importados com sucesso!");
+  };
+
+  reader.readAsArrayBuffer(arquivo);
+}
+
+/* ================= EXPORTAR EXCEL ================= */
+
+window.exportarExcel = async function(){
+
+  const snapshot = await getDocs(
+    collection(db,"cotacoes",cotacaoId,"produtos")
+  );
+
+  const dados = [];
+
+  snapshot.forEach(docSnap=>{
+    const d = docSnap.data();
+    dados.push({
+      nome: d.nome,
+      quantidade: d.quantidade,
+      unidade: d.unidade,
+      observacao: d.observacao
+    });
+  });
+
+  const ws = XLSX.utils.json_to_sheet(dados);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Produtos");
+
+  XLSX.writeFile(wb,"produtos.xlsx");
+}
+
+/* ================= VOLTAR ================= */
+
 window.voltar = function(){
   window.location.href="admin.html";
 }
+
 </script>
+</body>
+</html>
