@@ -1,103 +1,67 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <title>Cotações São Raimundo</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>São Raimundo Supermercado</title>
 
-  <style>
-    body {
-      font-family: Arial;
-      background: #0f172a;
-      color: white;
-      text-align: center;
-      padding: 20px;
-    }
+<style>
+body{
+  margin:0;
+  height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  background:linear-gradient(135deg,#8B0000,#B22222);
+  overflow:hidden;
+}
 
-    input, button {
-      padding: 10px;
-      margin: 5px;
-      border-radius: 8px;
-      border: none;
-    }
+/* Container da logo */
+.splash{
+  text-align:center;
+  animation:fadeIn 1.5s ease-in-out;
+}
 
-    button {
-      background: #22c55e;
-      color: white;
-      cursor: pointer;
-    }
+/* Logo */
+.splash img{
+  width:220px;
+  animation:pulse 2s infinite;
+}
 
-    .card {
-      background: #1e293b;
-      padding: 15px;
-      margin: 10px;
-      border-radius: 10px;
-    }
-  </style>
+/* Nome */
+.splash h1{
+  color:white;
+  font-family:Arial, Helvetica, sans-serif;
+  margin-top:20px;
+  letter-spacing:2px;
+}
+
+/* Animação de entrada */
+@keyframes fadeIn{
+  from{opacity:0; transform:scale(0.8);}
+  to{opacity:1; transform:scale(1);}
+}
+
+/* Animação pulsar */
+@keyframes pulse{
+  0%{transform:scale(1);}
+  50%{transform:scale(1.08);}
+  100%{transform:scale(1);}
+}
+</style>
 </head>
+
 <body>
 
-<h1>Cotações São Raimundo</h1>
+<div class="splash">
+  <img src="logo.png" alt="São Raimundo">
+  <h1>São Raimundo Supermercado</h1>
+</div>
 
-<input type="text" id="nome" placeholder="Nome">
-<input type="number" id="valor" placeholder="Valor">
-<button onclick="salvar()">Salvar</button>
-
-<h2>Lista de Cotações</h2>
-<div id="lista"></div>
-
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, onSnapshot } 
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyCeJtoTDcNmA8aMLtRrHR-CoZUQkbe5TYk",
-    authDomain: "cot-online-sao-raimundo-sup.firebaseapp.com",
-    projectId: "cot-online-sao-raimundo-sup",
-    storageBucket: "cot-online-sao-raimundo-sup.firebasestorage.app",
-    messagingSenderId: "57432026650",
-    appId: "1:57432026650:web:8a47dd3f22b40bd6e02ba3"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  const lista = document.getElementById("lista");
-
-  // Mostrar dados em tempo real
-  onSnapshot(collection(db, "cotacoes"), (snapshot) => {
-    lista.innerHTML = "";
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      lista.innerHTML += `
-        <div class="card">
-          <strong>${data.nome}</strong><br>
-          Valor: R$ ${data.valor}
-        </div>
-      `;
-    });
-  });
-
-  // Salvar nova cotação
-  window.salvar = async function() {
-    const nome = document.getElementById("nome").value;
-    const valor = document.getElementById("valor").value;
-
-    if (!nome || !valor) {
-      alert("Preencha todos os campos");
-      return;
-    }
-
-    await addDoc(collection(db, "cotacoes"), {
-      nome: nome,
-      valor: Number(valor),
-      data: new Date().toLocaleDateString()
-    });
-
-    document.getElementById("nome").value = "";
-    document.getElementById("valor").value = "";
-  }
+<script>
+setTimeout(function(){
+  window.location.href = "admin.html";
+}, 3000);
 </script>
 
 </body>
