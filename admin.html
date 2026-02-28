@@ -15,34 +15,27 @@ body{
   color:white;
   text-align:center;
 }
-
 header{
   background:#B22222;
   padding:20px;
 }
-
 header img{
   width:180px;
   margin-bottom:10px;
 }
-
 .container{ padding:20px; }
-
 input,button,select{
   padding:10px;
   margin:5px;
   border-radius:8px;
   border:none;
 }
-
 button{
   background:#ff0000;
   color:white;
   cursor:pointer;
 }
-
 button:hover{ background:#cc0000; }
-
 .card{
   background:white;
   color:black;
@@ -179,7 +172,6 @@ onSnapshot(collection(db,"cotacoes"), snapshot=>{
 
   snapshot.forEach(docSnap=>{
     const data = docSnap.data();
-
     const inicio = data.inicio?.toDate ? data.inicio.toDate().toLocaleString() : "-";
     const fim = data.fim?.toDate ? data.fim.toDate().toLocaleString() : "-";
     const status = data.status || "ativa";
@@ -196,13 +188,8 @@ onSnapshot(collection(db,"cotacoes"), snapshot=>{
         <button onclick="encerrar('${docSnap.id}')">Encerrar</button>
         <br><br>
 
-        <button onclick="copiarLink('${docSnap.id}')">
-          Copiar Link Fornecedor
-        </button>
-
-        <button onclick="excluir('${docSnap.id}')">
-          Excluir
-        </button>
+        <button onclick="copiarLink('${docSnap.id}')">Copiar Link Fornecedor</button>
+        <button onclick="excluir('${docSnap.id}')">Excluir</button>
       </div>
     `;
 
@@ -211,17 +198,10 @@ onSnapshot(collection(db,"cotacoes"), snapshot=>{
   });
 });
 
-window.ativar = async function(id){
-  await updateDoc(doc(db,"cotacoes",id),{ status:"ativa" });
-}
-
-window.desativar = async function(id){
-  await updateDoc(doc(db,"cotacoes",id),{ status:"desativada" });
-}
-
-window.encerrar = async function(id){
-  await updateDoc(doc(db,"cotacoes",id),{ status:"encerrada" });
-}
+window.ativar = async id => await updateDoc(doc(db,"cotacoes",id),{ status:"ativa" });
+window.desativar = async id => await updateDoc(doc(db,"cotacoes",id),{ status:"desativada" });
+window.encerrar = async id => await updateDoc(doc(db,"cotacoes",id),{ status:"encerrada" });
+window.excluir = async id => await deleteDoc(doc(db,"cotacoes",id));
 
 window.copiarLink = function(id){
   const base = window.location.href.replace("admin.html","");
@@ -230,9 +210,93 @@ window.copiarLink = function(id){
   alert("Link copiado:\n\n" + link);
 }
 
-window.excluir = async id=>{
-  await deleteDoc(doc(db,"cotacoes",id));
+/* ================= IMPORTAR EXCEL ================= */
+
+window.importarExcel = async function(){
+
+  const cotacaoId = selectImport.value;
+  const file = document.getElementById("arquivoExcel").files[0];
+
+  if(!cotacaoId) return alert("Selecione a cotação");
+  if(!file) return alert("Selecione o arquivo Excel");
+
+  const reader = new FileReader();
+
+  reader.onload = async function(e){
+
+    try{
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data,{type:"array"});
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet);
+
+      for(const item of json){
+
+        const nome = item.nome || item.Nome;
+        const quantidade = item.quantidade || item.Quantidade;
+        const unidade = item.unidade || item.Unidade;
+
+        if(!nome) continue;
+
+        await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+          nome,
+          quantidade: quantidade || "",
+          unidade: unidade || ""
+        });
+      }
+
+      alert("Produtos importados com sucesso!");
+
+    }catch(error){
+      console.error(error);
+      alert("Erro ao importar planilha.");
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
 }
+
+/* ================= EXPORTAR RELATÓRIO ================= */
+
+window.exportarRelatorio = async function(){
+
+  const cotacaoId = selectExport.value;
+  if(!cotacaoId) return alert("Selecione a cotação");
+
+  const produtosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
+  let relatorio=[];
+
+  for(const produtoDoc of produtosSnap.docs){
+
+    const produto = produtoDoc.data();
+    const precosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos",produtoDoc.id,"precos"));
+
+    let menor=null;
+    let vencedor="-";
+
+    precosSnap.forEach(p=>{
+      const valor=parseFloat(p.data().preco);
+      if(menor===null || valor<menor){
+        menor=valor;
+        vencedor=p.data().fornecedor;
+      }
+    });
+
+    relatorio.push({
+      Produto: produto.nome,
+      Quantidade: produto.quantidade,
+      Unidade: produto.unidade,
+      "Menor Preço": menor ?? "Sem lance",
+      Fornecedor: vencedor
+    });
+  }
+
+  const ws = XLSX.utils.json_to_sheet(relatorio);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Relatório Final");
+  XLSX.writeFile(wb, "Relatorio_Final.xlsx");
+}
+
 </script>
 </body>
 </html>
