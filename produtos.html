@@ -43,6 +43,11 @@ button:hover{ background:#cc0000; }
   border-radius:10px;
   max-width:400px;
 }
+
+#statusMsg{
+  font-weight:bold;
+  margin-bottom:15px;
+}
 </style>
 </head>
 
@@ -55,6 +60,7 @@ Gerenciar Produtos
 <div class="container">
 
 <h3 id="nomeCotacao"></h3>
+<div id="statusMsg"></div>
 
 <input type="text" id="nomeProduto" placeholder="Nome do produto"><br>
 <input type="number" id="quantidade" placeholder="Quantidade"><br>
@@ -74,7 +80,7 @@ Gerenciar Produtos
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } 
+import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, getDoc } 
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -99,6 +105,52 @@ if(!cotacaoId){
 
 document.getElementById("nomeCotacao").innerText = cotacaoNome;
 
+const statusMsg = document.getElementById("statusMsg");
+let edicaoLiberada = true;
+
+// ================= VERIFICAR STATUS =================
+
+async function verificarStatus(){
+
+  const cotacaoSnap = await getDoc(doc(db,"cotacoes",cotacaoId));
+
+  if(!cotacaoSnap.exists()){
+    statusMsg.innerText = "Cotação não encontrada";
+    edicaoLiberada = false;
+    return;
+  }
+
+  const dados = cotacaoSnap.data();
+  const agora = new Date();
+  const fim = dados.fim.toDate();
+  const status = dados.status || "ativa";
+
+  if(status === "encerrada"){
+    statusMsg.innerText = "⛔ Cotação encerrada";
+    edicaoLiberada = false;
+    return;
+  }
+
+  if(status === "desativada"){
+    statusMsg.innerText = "⚠️ Cotação desativada";
+    edicaoLiberada = false;
+    return;
+  }
+
+  if(agora > fim){
+    statusMsg.innerText = "⛔ Tempo da cotação finalizado";
+    edicaoLiberada = false;
+    return;
+  }
+
+  statusMsg.innerText = "✅ Cotação ativa";
+  edicaoLiberada = true;
+}
+
+verificarStatus();
+
+// ================= LISTAR PRODUTOS =================
+
 const lista = document.getElementById("listaProdutos");
 
 onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), snapshot=>{
@@ -115,12 +167,23 @@ onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), snapshot=>{
   });
 });
 
+// ================= ADICIONAR =================
+
 window.adicionarProduto = async function(){
+
+  if(!edicaoLiberada){
+    alert("Edição bloqueada.");
+    return;
+  }
+
   const nome = nomeProduto.value;
   const quantidade = quantidade.value;
   const unidade = unidade.value;
 
-  if(!nome || !quantidade || !unidade) return alert("Preencha tudo");
+  if(!nome || !quantidade || !unidade){
+    alert("Preencha tudo");
+    return;
+  }
 
   await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
     nome,
@@ -133,9 +196,19 @@ window.adicionarProduto = async function(){
   unidade.value="";
 }
 
+// ================= EXCLUIR =================
+
 window.excluir = async function(id){
+
+  if(!edicaoLiberada){
+    alert("Edição bloqueada.");
+    return;
+  }
+
   await deleteDoc(doc(db,"cotacoes",cotacaoId,"produtos",id));
 }
+
+// ================= VOLTAR =================
 
 window.voltar = function(){
   window.location.href="admin.html";
