@@ -1,25 +1,48 @@
-const CACHE_NAME = "cotacao-sr-v1";
-
+const CACHE_NAME = "cotacao-cache-v1";
 const urlsToCache = [
-  "index.html",
-  "admin.html",
-  "logo.png"
+  "/",
+  "/index.html",
+  "/admin.html",
+  "/fornecedor.html",
+  "/manifest.json",
+  "/logo.png",
+  "/style.css" // se tiver CSS externo
 ];
 
-self.addEventListener("install", function(event) {
+// Instalação
+self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(function(cache) {
-        return cache.addAll(urlsToCache);
-      })
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(urlsToCache);
+    })
   );
+  self.skipWaiting();
 });
 
-self.addEventListener("fetch", function(event) {
-  event.respondWith(
-    caches.match(event.request)
-      .then(function(response) {
-        return response || fetch(event.request);
+// Ativação
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.map(key => {
+        if(key !== CACHE_NAME){
+          return caches.delete(key);
+        }
       })
+    ))
+  );
+  self.clients.claim();
+});
+
+// Intercepta requisições
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    fetch(event.request)
+      .then(resp => {
+        return caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, resp.clone());
+          return resp;
+        });
+      })
+      .catch(() => caches.match(event.request))
   );
 });
