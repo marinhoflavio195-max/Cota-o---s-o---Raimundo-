@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin - São Raimundo Supermercado</title>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
@@ -69,32 +68,6 @@ button:hover{ background:#cc0000; }
 
 <div id="painel" style="display:none;">
 
-<h2>Criar Nova Cotação</h2>
-<input type="text" id="nomeCotacao" placeholder="Nome da cotação"><br>
-
-<label>Início:</label>
-<input type="datetime-local" id="inicioCotacao"><br>
-
-<label>Fim:</label>
-<input type="datetime-local" id="fimCotacao"><br>
-
-<button onclick="criarCotacao()">Criar Cotação</button>
-
-<hr>
-
-<h2>Lista de Cotações</h2>
-<div id="lista"></div>
-
-<hr>
-
-<h2>Importar Produtos via Excel</h2>
-
-<select id="cotacaoImport"></select><br>
-<input type="file" id="arquivoExcel" accept=".xlsx,.xls"><br>
-<button onclick="importarExcel()">Importar Produtos</button>
-
-<hr>
-
 <h2>Exportar Relatório Final (PDF)</h2>
 <select id="cotacaoExport"></select><br>
 <button onclick="exportarRelatorio()">Gerar PDF</button>
@@ -103,19 +76,9 @@ button:hover{ background:#cc0000; }
 </div>
 
 <script type="module">
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  deleteDoc, 
-  doc, 
-  onSnapshot,
-  getDocs,
-  updateDoc,
-  getDoc
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, getDoc } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const { jsPDF } = window.jspdf;
 
@@ -131,22 +94,32 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-/* ================= LOGIN ================= */
-
 window.entrar = function(){
   if(document.getElementById("senha").value === "1234"){
     document.getElementById("login").style.display="none";
     document.getElementById("painel").style.display="block";
+    carregarCotacoes();
   } else {
     alert("Senha incorreta!");
   }
+}
+
+const selectExport = document.getElementById("cotacaoExport");
+
+async function carregarCotacoes(){
+  const cotacoesSnap = await getDocs(collection(db,"cotacoes"));
+  selectExport.innerHTML="";
+  cotacoesSnap.forEach(docSnap=>{
+    const data = docSnap.data();
+    selectExport.innerHTML += `<option value="${docSnap.id}">${data.nome}</option>`;
+  });
 }
 
 /* ================= EXPORTAR PDF ================= */
 
 window.exportarRelatorio = async function(){
 
-  const cotacaoId = document.getElementById("cotacaoExport").value;
+  const cotacaoId = selectExport.value;
   if(!cotacaoId) return alert("Selecione a cotação");
 
   const cotacaoDoc = await getDoc(doc(db,"cotacoes",cotacaoId));
@@ -155,22 +128,14 @@ window.exportarRelatorio = async function(){
   const produtosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
 
   const pdf = new jsPDF("p","mm","a4");
-
   let y = 20;
 
   pdf.setFontSize(16);
-  pdf.text("SÃO RAIMUNDO SUPERMERCADO", 105, y, {align:"center"});
-  y+=8;
-
+  pdf.text("SÃO RAIMUNDO SUPERMERCADO", 105, y, {align:"center"}); y+=8;
   pdf.setFontSize(10);
-  pdf.text("Relatório Oficial de Cotação",105,y,{align:"center"});
-  y+=8;
-
-  pdf.text("Data: "+new Date().toLocaleString(),14,y);
-  y+=6;
-
-  pdf.text("Número da Cotação: "+cotacaoId,14,y);
-  y+=10;
+  pdf.text("Relatório Oficial de Cotação",105,y,{align:"center"}); y+=8;
+  pdf.text("Data: "+new Date().toLocaleString(),14,y); y+=6;
+  pdf.text("Número da Cotação: "+cotacaoId,14,y); y+=10;
 
   let totalFornecedor = {};
   let totalEconomizado = 0;
@@ -181,7 +146,6 @@ window.exportarRelatorio = async function(){
     const precosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos",produtoDoc.id,"precos"));
 
     let ranking = [];
-
     precosSnap.forEach(p=>{
       ranking.push({
         fornecedor:p.data().fornecedor,
@@ -191,16 +155,13 @@ window.exportarRelatorio = async function(){
     });
 
     if(ranking.length === 0){
-      pdf.text(produto.nome + " - SEM PREÇO",14,y);
-      y+=6;
+      pdf.text(produto.nome + " - SEM PREÇO",14,y); y+=6;
       continue;
     }
 
     ranking.sort((a,b)=>a.valor-b.valor);
-
     const menor = ranking[0].valor;
     const maior = ranking[ranking.length-1].valor;
-
     totalEconomizado += (maior - menor);
 
     pdf.text("Produto: "+produto.nome,14,y); y+=6;
@@ -211,8 +172,7 @@ window.exportarRelatorio = async function(){
         " | Tel: "+r.telefone+
         " | R$ "+r.valor.toFixed(2),
         18,y
-      );
-      y+=6;
+      ); y+=6;
 
       if(i===0){
         totalFornecedor[r.fornecedor] = (totalFornecedor[r.fornecedor] || 0) + r.valor;
@@ -220,25 +180,15 @@ window.exportarRelatorio = async function(){
     });
 
     y+=4;
-
-    if(y>270){
-      pdf.addPage();
-      y=20;
-    }
+    if(y>270){ pdf.addPage(); y=20; }
   }
 
-  pdf.addPage();
-  y=20;
-
+  pdf.addPage(); y=20;
   pdf.setFontSize(12);
   pdf.text("TOTAL POR FORNECEDOR",14,y); y+=8;
 
   for(const fornecedor in totalFornecedor){
-    pdf.text(
-      fornecedor+" - R$ "+totalFornecedor[fornecedor].toFixed(2),
-      14,y
-    );
-    y+=6;
+    pdf.text(fornecedor+" - R$ "+totalFornecedor[fornecedor].toFixed(2),14,y); y+=6;
   }
 
   y+=6;
@@ -246,7 +196,6 @@ window.exportarRelatorio = async function(){
 
   pdf.save("Relatorio_Cotacao_"+cotacaoId+".pdf");
 }
-
 </script>
 </body>
 </html>
