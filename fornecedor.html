@@ -71,6 +71,7 @@ São Raimundo Supermercado - Fornecedor
 <div id="statusMsg"></div>
 
 <input type="text" id="nomeFornecedor" placeholder="Seu nome ou empresa"><br>
+<input type="tel" id="telefoneFornecedor" placeholder="Seu telefone celular"><br>
 
 <div id="listaProdutos"></div>
 
@@ -198,7 +199,7 @@ onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), snapshot=>{
       <div class="card">
         <b>${data.nome}</b><br>
         ${data.quantidade} ${data.unidade}<br><br>
-        <input type="number" id="preco_${docSnap.id}" placeholder="Seu preço"><br>
+        <input type="number" step="0.01" id="preco_${docSnap.id}" placeholder="Seu preço"><br>
         <button onclick="enviar('${docSnap.id}')">Enviar Preço</button>
       </div>
     `;
@@ -214,21 +215,23 @@ window.enviar = async function(produtoId){
     return;
   }
 
-  const fornecedor = nomeFornecedor.value;
+  const fornecedor = document.getElementById("nomeFornecedor").value;
+  const telefone = document.getElementById("telefoneFornecedor").value;
   const preco = document.getElementById("preco_"+produtoId).value;
 
-  if(!fornecedor || !preco){
-    alert("Preencha seu nome e o preço");
+  if(!fornecedor || !telefone || !preco){
+    alert("Preencha nome, telefone e preço");
     return;
   }
 
   await addDoc(collection(db,"cotacoes",cotacaoId,"produtos",produtoId,"precos"),{
     fornecedor,
+    telefone,
     preco,
     data:new Date()
   });
 
-  alert("Preço enviado!");
+  alert("Preço enviado com sucesso!");
 }
 
 </script>
