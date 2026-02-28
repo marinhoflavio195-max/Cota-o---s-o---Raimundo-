@@ -1,1 +1,329 @@
 
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin - São Raimundo Supermercado</title>
+
+<!-- Dependências -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script type="module" src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial, Helvetica, sans-serif;
+  background:#8B0000;
+  color:white;
+  text-align:center;
+}
+header{
+  background:#B22222;
+  padding:20px;
+}
+header img{
+  width:180px;
+  margin-bottom:10px;
+}
+.container{ padding:20px; }
+input,button,select{
+  padding:10px;
+  margin:5px;
+  border-radius:8px;
+  border:none;
+}
+button{
+  background:#ff0000;
+  color:white;
+  cursor:pointer;
+}
+button:hover{ background:#cc0000; }
+.card{
+  background:white;
+  color:black;
+  padding:15px;
+  margin:10px auto;
+  border-radius:10px;
+  max-width:500px;
+}
+.status{
+  font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <img src="logo.png" alt="Logo">
+  <h2>PAINEL ADMINISTRATIVO</h2>
+</header>
+
+<div class="container">
+
+<!-- Login -->
+<div id="login">
+  <h2>Login Administrador</h2>
+  <input type="password" id="senha" placeholder="Digite a senha"><br>
+  <button onclick="entrar()">Entrar</button>
+</div>
+
+<!-- Painel -->
+<div id="painel" style="display:none;">
+
+<h2>Criar Nova Cotação</h2>
+<input type="text" id="nomeCotacao" placeholder="Nome da cotação"><br>
+<label>Início:</label>
+<input type="datetime-local" id="inicioCotacao"><br>
+<label>Fim:</label>
+<input type="datetime-local" id="fimCotacao"><br>
+<button onclick="criarCotacao()">Criar Cotação</button>
+
+<hr>
+
+<h2>Lista de Cotações</h2>
+<div id="lista"></div>
+
+<hr>
+
+<h2>Importar Produtos via Excel</h2>
+<select id="cotacaoImport"></select><br>
+<input type="file" id="arquivoExcel" accept=".xlsx,.xls"><br>
+<button onclick="importarExcel()">Importar Produtos</button>
+
+<hr>
+
+<h2>Exportar Relatório Final (PDF)</h2>
+<select id="cotacaoExport"></select><br>
+<button onclick="exportarRelatorio()">Gerar PDF</button>
+
+</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { 
+  getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot,
+  getDocs, updateDoc, getDoc
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+import { jsPDF } from "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+
+const firebaseConfig = {
+  apiKey: "SUA_API_KEY",
+  authDomain: "cotacao-sao-raimundo-oficial.firebaseapp.com",
+  projectId: "cotacao-sao-raimundo-oficial",
+  storageBucket: "cotacao-sao-raimundo-oficial.firebasestorage.app",
+  messagingSenderId: "999255626219",
+  appId: "1:999255626219:web:653adf6dedde30237fc9ae"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+/* ================= LOGIN ================= */
+window.entrar = function(){
+  if(document.getElementById("senha").value === "1234"){
+    document.getElementById("login").style.display="none";
+    document.getElementById("painel").style.display="block";
+    carregarCotacoes();
+    carregarCotacoesImport();
+  } else {
+    alert("Senha incorreta!");
+  }
+}
+
+/* ================= CRIAR COTAÇÃO ================= */
+window.criarCotacao = async function(){
+  const nome = document.getElementById("nomeCotacao").value;
+  const inicio = document.getElementById("inicioCotacao").value;
+  const fim = document.getElementById("fimCotacao").value;
+  if(!nome || !inicio || !fim){ alert("Preencha todos os campos"); return; }
+
+  await addDoc(collection(db,"cotacoes"),{
+    nome,
+    inicio:new Date(inicio),
+    fim:new Date(fim),
+    status:"ativa",
+    dataCriacao:new Date()
+  });
+
+  alert("Cotação criada com sucesso!");
+  document.getElementById("nomeCotacao").value="";
+  document.getElementById("inicioCotacao").value="";
+  document.getElementById("fimCotacao").value="";
+}
+
+/* ================= LISTA DE COTAÇÕES ================= */
+const lista = document.getElementById("lista");
+const selectExport = document.getElementById("cotacaoExport");
+const selectImport = document.getElementById("cotacaoImport");
+
+onSnapshot(collection(db,"cotacoes"), snapshot=>{
+  lista.innerHTML="";
+  selectExport.innerHTML="";
+  selectImport.innerHTML="";
+
+  snapshot.forEach(docSnap=>{
+    const data = docSnap.data();
+    const inicio = data.inicio?.toDate ? data.inicio.toDate().toLocaleString() : "-";
+    const fim = data.fim?.toDate ? data.fim.toDate().toLocaleString() : "-";
+    const status = data.status || "ativa";
+
+    lista.innerHTML+=`
+      <div class="card">
+        <b>${data.nome}</b><br>
+        Início: ${inicio}<br>
+        Fim: ${fim}<br>
+        Status: <span class="status">${status.toUpperCase()}</span><br><br>
+
+        <button onclick="ativar('${docSnap.id}')">Ativar</button>
+        <button onclick="desativar('${docSnap.id}')">Desativar</button>
+        <button onclick="encerrar('${docSnap.id}')">Encerrar</button>
+        <br><br>
+
+        <button onclick="copiarLink('${docSnap.id}')">Copiar Link Fornecedor</button>
+        <button onclick="excluir('${docSnap.id}')">Excluir</button>
+      </div>
+    `;
+
+    selectExport.innerHTML+=`<option value="${docSnap.id}">${data.nome}</option>`;
+    selectImport.innerHTML+=`<option value="${docSnap.id}">${data.nome}</option>`;
+  });
+});
+
+window.ativar = async id => await updateDoc(doc(db,"cotacoes",id),{ status:"ativa" });
+window.desativar = async id => await updateDoc(doc(db,"cotacoes",id),{ status:"desativada" });
+window.encerrar = async id => await updateDoc(doc(db,"cotacoes",id),{ status:"encerrada" });
+window.excluir = async id => await deleteDoc(doc(db,"cotacoes",id));
+
+window.copiarLink = function(id){
+  const base = window.location.href.replace("admin.html","");
+  const link = base + "fornecedor.html?id=" + id;
+  navigator.clipboard.writeText(link);
+  alert("Link copiado:\n\n" + link);
+}
+
+/* ================= IMPORTAR EXCEL ================= */
+window.importarExcel = async function(){
+  const cotacaoId = selectImport.value;
+  const file = document.getElementById("arquivoExcel").files[0];
+  if(!cotacaoId){ alert("Selecione a cotação"); return; }
+  if(!file){ alert("Selecione o arquivo Excel"); return; }
+
+  const reader = new FileReader();
+  reader.onload = async function(e){
+    try{
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data,{type:"array"});
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet);
+
+      for(const item of json){
+        const nome = item.nome || item.Nome;
+        const quantidade = item.quantidade || item.Quantidade;
+        const unidade = item.unidade || item.Unidade;
+        if(!nome) continue;
+        await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+          nome,
+          quantidade: quantidade || "",
+          unidade: unidade || ""
+        });
+      }
+
+      alert("Produtos importados com sucesso!");
+    }catch(error){
+      console.error(error);
+      alert("Erro ao importar planilha.");
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ================= EXPORTAR RELATÓRIO PDF ================= */
+window.exportarRelatorio = async function(){
+  const cotacaoId = selectExport.value;
+  if(!cotacaoId){ alert("Selecione a cotação"); return; }
+
+  const cotacaoDoc = await getDoc(doc(db,"cotacoes",cotacaoId));
+  const cotacaoData = cotacaoDoc.data();
+
+  const produtosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
+
+  const pdf = new jsPDF("p","mm","a4");
+  let y = 20;
+
+  // Logo e cabeçalho
+  const img = new Image();
+  img.src = "logo.png"; // logo no topo
+  img.onload = () => {
+    pdf.addImage(img, 'PNG', 80, 10, 50, 20);
+    y += 30;
+
+    pdf.setFontSize(16);
+    pdf.text("PAINEL ADMINISTRATIVO - COTAÇÃO",105,y,{align:"center"}); y+=8;
+    pdf.setFontSize(10);
+    pdf.text("Data/Hora: "+new Date().toLocaleString(),14,y); y+=6;
+    pdf.text("Número da Cotação: "+cotacaoId,14,y); y+=10;
+
+    let totalFornecedor = {};
+    let totalEconomizado = 0;
+
+    (async function processarProdutos(){
+      for(const produtoDoc of produtosSnap.docs){
+        const produto = produtoDoc.data();
+        const precosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos",produtoDoc.id,"precos"));
+        let ranking = [];
+
+        precosSnap.forEach(p=>{
+          ranking.push({
+            fornecedor:p.data().fornecedor,
+            telefone:p.data().telefone || "",
+            valor:parseFloat(p.data().preco)
+          });
+        });
+
+        if(ranking.length === 0){
+          pdf.text(produto.nome + " - SEM PREÇO",14,y); y+=6;
+          continue;
+        }
+
+        ranking.sort((a,b)=>a.valor-b.valor);
+        const menor = ranking[0].valor;
+        const maior = ranking[ranking.length-1].valor;
+        totalEconomizado += (maior - menor);
+
+        pdf.text("Produto: "+produto.nome,14,y); y+=6;
+
+        ranking.slice(0,3).forEach((r,i)=>{
+          pdf.text(
+            (i+1)+"º Lugar: "+r.fornecedor+" | Tel: "+r.telefone+" | R$ "+r.valor.toFixed(2),
+            18,y
+          ); y+=6;
+
+          if(i===0){
+            totalFornecedor[r.fornecedor] = (totalFornecedor[r.fornecedor] || 0) + r.valor;
+          }
+        });
+
+        y+=4;
+        if(y>270){ pdf.addPage(); y=20; }
+      }
+
+      pdf.addPage(); y=20;
+      pdf.setFontSize(12);
+      pdf.text("TOTAL POR FORNECEDOR",14,y); y+=8;
+      for(const f in totalFornecedor){
+        pdf.text(f+" - R$ "+totalFornecedor[f].toFixed(2),14,y); y+=6;
+      }
+      y+=6;
+      pdf.text("TOTAL GERAL ECONOMIZADO: R$ "+totalEconomizado.toFixed(2),14,y);
+
+      pdf.save("Relatorio_Cotacao_"+cotacaoId+".pdf");
+    })();
+  }
+}
+</script>
+</body>
+</html>
