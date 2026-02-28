@@ -43,6 +43,17 @@ button:hover{ background:#cc0000; }
   border-radius:10px;
   max-width:400px;
 }
+
+#cronometro{
+  font-size:18px;
+  font-weight:bold;
+  margin:10px 0;
+}
+
+#statusMsg{
+  font-weight:bold;
+  margin:10px 0;
+}
 </style>
 </head>
 
@@ -55,6 +66,9 @@ São Raimundo Supermercado - Fornecedor
 <div class="container">
 
 <h3 id="nomeCotacao"></h3>
+
+<div id="cronometro"></div>
+<div id="statusMsg"></div>
 
 <input type="text" id="nomeFornecedor" placeholder="Seu nome ou empresa"><br>
 
@@ -90,7 +104,89 @@ if(!cotacaoId){
 const cotacaoRef = doc(db,"cotacoes",cotacaoId);
 const cotacaoSnap = await getDoc(cotacaoRef);
 
-document.getElementById("nomeCotacao").innerText = cotacaoSnap.data().nome;
+if(!cotacaoSnap.exists()){
+  document.body.innerHTML="<h2>Cotação não encontrada</h2>";
+}
+
+const dadosCotacao = cotacaoSnap.data();
+
+document.getElementById("nomeCotacao").innerText = dadosCotacao.nome;
+
+const statusMsg = document.getElementById("statusMsg");
+const cronometro = document.getElementById("cronometro");
+
+let envioLiberado = true;
+
+// ================= STATUS =================
+
+function verificarStatus(){
+
+  const agora = new Date();
+  const inicio = dadosCotacao.inicio.toDate();
+  const fim = dadosCotacao.fim.toDate();
+  const status = dadosCotacao.status || "ativa";
+
+  if(status === "encerrada"){
+    statusMsg.innerText = "⛔ Cotação encerrada pelo administrador";
+    envioLiberado = false;
+    return;
+  }
+
+  if(status === "desativada"){
+    statusMsg.innerText = "⚠️ Cotação temporariamente desativada";
+    envioLiberado = false;
+    return;
+  }
+
+  if(agora < inicio){
+    statusMsg.innerText = "⏳ Cotação ainda não iniciou";
+    envioLiberado = false;
+    return;
+  }
+
+  if(agora > fim){
+    statusMsg.innerText = "⛔ Cotação finalizada por tempo";
+    envioLiberado = false;
+    return;
+  }
+
+  statusMsg.innerText = "✅ Cotação ativa";
+  envioLiberado = true;
+}
+
+verificarStatus();
+
+// ================= CRONÔMETRO =================
+
+function iniciarCronometro(){
+
+  const fim = dadosCotacao.fim.toDate();
+
+  setInterval(()=>{
+    const agora = new Date();
+    const diff = fim - agora;
+
+    if(diff <= 0){
+      cronometro.innerText = "Tempo encerrado";
+      envioLiberado = false;
+      return;
+    }
+
+    const horas = Math.floor(diff / (1000*60*60));
+    const minutos = Math.floor((diff % (1000*60*60)) / (1000*60));
+    const segundos = Math.floor((diff % (1000*60)) / 1000);
+
+    cronometro.innerText = 
+      "Tempo restante: " +
+      horas + "h " +
+      minutos + "m " +
+      segundos + "s";
+  },1000);
+}
+
+iniciarCronometro();
+
+// ================= PRODUTOS =================
 
 const lista = document.getElementById("listaProdutos");
 
@@ -109,15 +205,27 @@ onSnapshot(collection(db,"cotacoes",cotacaoId,"produtos"), snapshot=>{
   });
 });
 
+// ================= ENVIAR =================
+
 window.enviar = async function(produtoId){
+
+  if(!envioLiberado){
+    alert("Envio bloqueado.");
+    return;
+  }
+
   const fornecedor = nomeFornecedor.value;
   const preco = document.getElementById("preco_"+produtoId).value;
 
-  if(!fornecedor || !preco) return alert("Preencha seu nome e o preço");
+  if(!fornecedor || !preco){
+    alert("Preencha seu nome e o preço");
+    return;
+  }
 
   await addDoc(collection(db,"cotacoes",cotacaoId,"produtos",produtoId,"precos"),{
     fornecedor,
-    preco
+    preco,
+    data:new Date()
   });
 
   alert("Preço enviado!");
