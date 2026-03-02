@@ -6,7 +6,6 @@
 <title>Admin - São Raimundo Supermercado</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 body{
@@ -48,6 +47,9 @@ button:hover{ background:#cc0000; }
 .status{
   font-weight:bold;
 }
+hr{
+  margin:25px 0;
+}
 </style>
 </head>
 
@@ -88,17 +90,17 @@ button:hover{ background:#cc0000; }
 <hr>
 
 <h2>Importar Produtos via Excel</h2>
-
 <select id="cotacaoImport"></select><br>
 <input type="file" id="arquivoExcel" accept=".xlsx,.xls"><br>
 <button onclick="importarExcel()">Importar Produtos</button>
+
+<div id="areaProdutos"></div>
 
 <hr>
 
 <h2>Exportar Relatório Final</h2>
 <select id="cotacaoExport"></select><br>
-<button onclick="exportarRelatorio()">Exportar Excel</button>
-<button onclick="exportarPDF()">Exportar PDF</button>
+<button onclick="exportarRelatorio()">Exportar Relatório</button>
 
 </div>
 </div>
@@ -211,7 +213,75 @@ window.copiarLink = function(id){
   alert("Link copiado:\n\n" + link);
 }
 
-/* ================= EXPORTAR EXCEL ================= */
+/* IMPORTAR EXCEL */
+
+window.importarExcel = async function(){
+
+  const cotacaoId = selectImport.value;
+  const file = document.getElementById("arquivoExcel").files[0];
+
+  if(!cotacaoId) return alert("Selecione a cotação");
+  if(!file) return alert("Selecione o arquivo Excel");
+
+  const reader = new FileReader();
+
+  reader.onload = async function(e){
+
+    try{
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data,{type:"array"});
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet);
+
+      let contador = 0;
+
+      for(const item of json){
+
+        const nome = item.nome || item.Nome;
+        const quantidade = item.quantidade || item.Quantidade;
+        const unidade = item.unidade || item.Unidade;
+
+        if(!nome) continue;
+
+        await addDoc(collection(db,"cotacoes",cotacaoId,"produtos"),{
+          nome,
+          quantidade: quantidade || "",
+          unidade: unidade || ""
+        });
+
+        contador++;
+      }
+
+      alert(`✅ ${contador} produtos importados com sucesso!`);
+      listarProdutos(cotacaoId);
+
+    }catch(error){
+      console.error(error);
+      alert("Erro ao importar planilha.");
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
+async function listarProdutos(cotacaoId){
+
+  const area = document.getElementById("areaProdutos");
+  area.innerHTML="<h2>Produtos Importados</h2>";
+
+  const produtosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
+
+  produtosSnap.forEach(docSnap=>{
+    const p = docSnap.data();
+    area.innerHTML+=`
+      <div class="card">
+        ${p.nome} - ${p.quantidade || ""} ${p.unidade || ""}
+      </div>
+    `;
+  });
+}
+
+/* EXPORTAR RELATÓRIO */
 
 window.exportarRelatorio = async function(){
 
@@ -250,55 +320,6 @@ window.exportarRelatorio = async function(){
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Relatório Final");
   XLSX.writeFile(wb, "Relatorio_Final.xlsx");
-}
-
-/* ================= EXPORTAR PDF ================= */
-
-window.exportarPDF = async function(){
-
-  const cotacaoId = selectExport.value;
-  if(!cotacaoId) return alert("Selecione a cotação");
-
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF("p","mm","a4");
-
-  let y = 20;
-
-  pdf.setFontSize(14);
-  pdf.text("RELATÓRIO FINAL DE COTAÇÃO", 105, y, {align:"center"});
-  y += 10;
-
-  const produtosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
-
-  for(const produtoDoc of produtosSnap.docs){
-
-    const produto = produtoDoc.data();
-    const precosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos",produtoDoc.id,"precos"));
-
-    let menor=null;
-    let vencedor="-";
-
-    precosSnap.forEach(p=>{
-      const valor=parseFloat(p.data().preco);
-      if(menor===null || valor<menor){
-        menor=valor;
-        vencedor=p.data().fornecedor;
-      }
-    });
-
-    let texto = `Produto: ${produto.nome} | Menor: ${menor ?? "Sem lance"} | Fornecedor: ${vencedor}`;
-
-    pdf.setFontSize(10);
-    pdf.text(texto, 10, y);
-    y += 6;
-
-    if(y > 280){
-      pdf.addPage();
-      y = 20;
-    }
-  }
-
-  pdf.save("Relatorio_Final.pdf");
 }
 
 </script>
