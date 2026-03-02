@@ -21,25 +21,14 @@ body{
 }
 .splash{
   text-align:center;
-  animation:fadeIn 1.5s ease-in-out;
 }
 .splash img{
   width:220px;
-  animation:pulse 2s infinite;
 }
 .splash h1{
   color:white;
   margin-top:20px;
   letter-spacing:2px;
-}
-@keyframes fadeIn{
-  from{opacity:0; transform:scale(0.8);}
-  to{opacity:1; transform:scale(1);}
-}
-@keyframes pulse{
-  0%{transform:scale(1);}
-  50%{transform:scale(1.08);}
-  100%{transform:scale(1);}
 }
 </style>
 </head>
@@ -52,16 +41,14 @@ body{
 </div>
 
 <script>
-// Redireciona após 3 segundos
+// força sempre carregar versão nova
 setTimeout(function(){
-  window.location.href = "admin.html";
-}, 3000);
+  window.location.href = "admin.html?v=" + new Date().getTime();
+}, 2000);
 
-// Registrar Service Worker atualizado
+// Service Worker atualizado
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js?v=' + new Date().getTime())
-  .then(reg => console.log("Service Worker registrado:", reg))
-  .catch(err => console.error("Erro SW:", err));
+  navigator.serviceWorker.register('sw.js?v=' + new Date().getTime());
 }
 </script>
 
