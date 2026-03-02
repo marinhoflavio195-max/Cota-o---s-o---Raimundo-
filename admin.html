@@ -5,8 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin - São Raimundo Supermercado</title>
 
+<!-- XLSX -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script type="module" src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<!-- jsPDF NORMAL (NÃO module) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 body{margin:0;font-family:Arial;background:#8B0000;color:white;text-align:center;}
@@ -40,12 +43,16 @@ button:hover{background:#cc0000;}
   <select id="cotacaoExport"></select><br>
   <button onclick="exportarRelatorio()">Gerar PDF</button>
 </div>
+
 </div>
 
 <script type="module">
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { jsPDF } from "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+import { getFirestore, collection, getDocs, doc, getDoc } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const { jsPDF } = window.jspdf; // <- CORRETO AQUI
 
 const firebaseConfig = {
   apiKey: "SUA_API_KEY",
@@ -55,6 +62,7 @@ const firebaseConfig = {
   messagingSenderId: "999255626219",
   appId: "1:999255626219:web:653adf6dedde30237fc9ae"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
@@ -64,88 +72,118 @@ window.entrar = async function(){
   if(document.getElementById("senha").value === "1234"){
     document.getElementById("login").style.display="none";
     document.getElementById("painel").style.display="block";
+
     const snapshot = await getDocs(collection(db,"cotacoes"));
     selectExport.innerHTML = "";
+
     snapshot.forEach(docSnap=>{
       const data = docSnap.data();
       selectExport.innerHTML += `<option value="${docSnap.id}">${data.nome}</option>`;
     });
-  } else alert("Senha incorreta!");
+
+  } else {
+    alert("Senha incorreta!");
+  }
 }
 
 window.exportarRelatorio = async function(){
+
   const cotacaoId = selectExport.value;
   if(!cotacaoId){ alert("Selecione a cotação"); return; }
 
-  const cotacaoDoc = await getDoc(doc(db,"cotacoes",cotacaoId));
-  const cotacaoData = cotacaoDoc.data();
   const produtosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
 
   const pdf = new jsPDF("p","mm","a4");
-  let y = 30;
+  let y = 20;
 
-  // Logo
-  const img = new Image();
-  img.src = "logo.png";
+  pdf.setFontSize(16);
+  pdf.text("SÃO RAIMUNDO SUPERMERCADO",105,y,{align:"center"});
+  y+=10;
 
-  img.onload = async () => {
-    pdf.addImage(img,'PNG',80,10,50,20);
+  pdf.setFontSize(10);
+  pdf.text("Data: "+new Date().toLocaleString(),14,y);
+  y+=8;
 
-    pdf.setFontSize(16);
-    pdf.text("PAINEL ADMINISTRATIVO - COTAÇÃO",105,y,{align:"center"}); y+=8;
-    pdf.setFontSize(10);
-    pdf.text("Data/Hora: "+new Date().toLocaleString(),14,y); y+=6;
-    pdf.text("Número da Cotação: "+cotacaoId,14,y); y+=10;
+  let totalFornecedor = {};
+  let totalEconomizado = 0;
 
-    let totalFornecedor = {};
-    let totalEconomizado = 0;
+  for(const produtoDoc of produtosSnap.docs){
 
-    for(const produtoDoc of produtosSnap.docs){
-      const produto = produtoDoc.data();
-      const precosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos",produtoDoc.id,"precos"));
-      let ranking = [];
-      precosSnap.forEach(p=>{
-        ranking.push({
-          fornecedor: p.data().fornecedor,
-          telefone: p.data().telefone || "",
-          valor: parseFloat(p.data().preco)
-        });
+    const produto = produtoDoc.data();
+    const precosSnap = await getDocs(
+      collection(db,"cotacoes",cotacaoId,"produtos",produtoDoc.id,"precos")
+    );
+
+    let ranking = [];
+
+    precosSnap.forEach(p=>{
+      ranking.push({
+        fornecedor:p.data().fornecedor,
+        telefone:p.data().telefone || "",
+        valor:parseFloat(p.data().preco)
       });
+    });
 
-      if(ranking.length === 0){
-        pdf.text(produto.nome + " - SEM PREÇO",14,y); y+=6;
-        continue;
-      }
-
-      ranking.sort((a,b)=>a.valor-b.valor);
-      const menor = ranking[0].valor;
-      const maior = ranking[ranking.length-1].valor;
-      totalEconomizado += (maior-menor);
-
-      pdf.text("Produto: "+produto.nome,14,y); y+=6;
-      ranking.slice(0,3).forEach((r,i)=>{
-        pdf.text(`${i+1}º Lugar: ${r.fornecedor} | Tel: ${r.telefone} | R$ ${r.valor.toFixed(2)}`,18,y);
-        y+=6;
-        if(i===0) totalFornecedor[r.fornecedor] = (totalFornecedor[r.fornecedor] || 0) + r.valor;
-      });
-
-      y+=4;
-      if(y>270){ pdf.addPage(); y=20; }
+    if(ranking.length === 0){
+      pdf.text(produto.nome + " - SEM PREÇO",14,y);
+      y+=6;
+      continue;
     }
 
-    // Totais
-    pdf.addPage(); y=20;
-    pdf.setFontSize(12);
-    pdf.text("TOTAL POR FORNECEDOR",14,y); y+=8;
-    for(const f in totalFornecedor){
-      pdf.text(`${f} - R$ ${totalFornecedor[f].toFixed(2)}`,14,y); y+=6;
-    }
+    ranking.sort((a,b)=>a.valor-b.valor);
+
+    const menor = ranking[0].valor;
+    const maior = ranking[ranking.length-1].valor;
+    totalEconomizado += (maior-menor);
+
+    pdf.text("Produto: "+produto.nome,14,y);
     y+=6;
-    pdf.text("TOTAL GERAL ECONOMIZADO: R$ "+totalEconomizado.toFixed(2),14,y);
 
-    pdf.save(`Relatorio_Cotacao_${cotacaoId}.pdf`);
+    ranking.slice(0,3).forEach((r,i)=>{
+      pdf.text(
+        (i+1)+"º Lugar: "+r.fornecedor+
+        " | Tel: "+r.telefone+
+        " | R$ "+r.valor.toFixed(2),
+        18,y
+      );
+      y+=6;
+
+      if(i===0){
+        totalFornecedor[r.fornecedor] = 
+          (totalFornecedor[r.fornecedor] || 0) + r.valor;
+      }
+    });
+
+    y+=4;
+    if(y>270){
+      pdf.addPage();
+      y=20;
+    }
   }
+
+  pdf.addPage();
+  y=20;
+
+  pdf.setFontSize(12);
+  pdf.text("TOTAL POR FORNECEDOR",14,y);
+  y+=8;
+
+  for(const f in totalFornecedor){
+    pdf.text(f+" - R$ "+totalFornecedor[f].toFixed(2),14,y);
+    y+=6;
+  }
+
+  y+=6;
+  pdf.text(
+    "TOTAL GERAL ECONOMIZADO: R$ "+
+    totalEconomizado.toFixed(2),
+    14,y
+  );
+
+  pdf.save("Relatorio_Cotacao_"+cotacaoId+".pdf");
 }
+
 </script>
+
 </body>
 </html>
