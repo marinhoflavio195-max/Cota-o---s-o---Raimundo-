@@ -9,22 +9,52 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-body{margin:0;font-family:Arial;background:#8B0000;color:white;text-align:center;}
-header{background:#B22222;padding:20px;}
-header img{width:180px;margin-bottom:10px;}
-.container{padding:20px;}
-input,button,select{padding:10px;margin:5px;border-radius:8px;border:none;}
-button{background:#ff0000;color:white;cursor:pointer;}
-button:hover{background:#cc0000;}
-.card{background:white;color:black;padding:15px;margin:10px auto;border-radius:10px;max-width:500px;}
-.status{font-weight:bold;}
+body{
+  margin:0;
+  font-family:Arial, Helvetica, sans-serif;
+  background:#8B0000;
+  color:white;
+  text-align:center;
+}
+header{
+  background:#B22222;
+  padding:20px;
+}
+header img{
+  width:180px;
+  margin-bottom:10px;
+}
+.container{ padding:20px; }
+input,button,select{
+  padding:10px;
+  margin:5px;
+  border-radius:8px;
+  border:none;
+}
+button{
+  background:#ff0000;
+  color:white;
+  cursor:pointer;
+}
+button:hover{ background:#cc0000; }
+.card{
+  background:white;
+  color:black;
+  padding:15px;
+  margin:10px auto;
+  border-radius:10px;
+  max-width:500px;
+}
+.status{
+  font-weight:bold;
+}
 </style>
 </head>
 
 <body>
 
 <header>
-  <img src="logo.png" alt="Logo">
+  <img src="logo.png">
   <h2>PAINEL ADMINISTRATIVO</h2>
 </header>
 
@@ -32,21 +62,60 @@ button:hover{background:#cc0000;}
 
 <div id="login">
   <h2>Login Administrador</h2>
-  <input type="password" id="senha" placeholder="Digite a senha"><br>
+  <input type="password" id="senha" placeholder="Digite a senha">
+  <br>
   <button onclick="entrar()">Entrar</button>
 </div>
 
 <div id="painel" style="display:none;">
-  <h2>Exportar Relatório Final (PDF)</h2>
-  <select id="cotacaoExport"></select><br>
-  <button onclick="exportarRelatorio()">Gerar PDF</button>
-</div>
 
+<h2>Criar Nova Cotação</h2>
+<input type="text" id="nomeCotacao" placeholder="Nome da cotação"><br>
+
+<label>Início:</label>
+<input type="datetime-local" id="inicioCotacao"><br>
+
+<label>Fim:</label>
+<input type="datetime-local" id="fimCotacao"><br>
+
+<button onclick="criarCotacao()">Criar Cotação</button>
+
+<hr>
+
+<h2>Lista de Cotações</h2>
+<div id="lista"></div>
+
+<hr>
+
+<h2>Importar Produtos via Excel</h2>
+
+<select id="cotacaoImport"></select><br>
+<input type="file" id="arquivoExcel" accept=".xlsx,.xls"><br>
+<button onclick="importarExcel()">Importar Produtos</button>
+
+<hr>
+
+<h2>Exportar Relatório Final</h2>
+<select id="cotacaoExport"></select><br>
+<button onclick="exportarRelatorio()">Exportar Excel</button>
+<button onclick="exportarPDF()">Exportar PDF</button>
+
+</div>
 </div>
 
 <script type="module">
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot,
+  getDocs,
+  updateDoc
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "SUA_API_KEY",
@@ -60,111 +129,178 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const selectExport = document.getElementById("cotacaoExport");
-
-window.entrar = async function(){
+window.entrar = function(){
   if(document.getElementById("senha").value === "1234"){
     document.getElementById("login").style.display="none";
     document.getElementById("painel").style.display="block";
-
-    const snapshot = await getDocs(collection(db,"cotacoes"));
-    selectExport.innerHTML="";
-    snapshot.forEach(docSnap=>{
-      const data = docSnap.data();
-      selectExport.innerHTML += `<option value="${docSnap.id}">${data.nome}</option>`;
-    });
-
   } else {
     alert("Senha incorreta!");
   }
 }
 
+window.criarCotacao = async function(){
+  const nome = nomeCotacao.value;
+  const inicio = inicioCotacao.value;
+  const fim = fimCotacao.value;
+
+  if(!nome || !inicio || !fim){
+    alert("Preencha todos os campos");
+    return;
+  }
+
+  await addDoc(collection(db,"cotacoes"),{
+    nome,
+    inicio:new Date(inicio),
+    fim:new Date(fim),
+    status:"ativa",
+    dataCriacao:new Date()
+  });
+
+  alert("Cotação criada com sucesso!");
+  nomeCotacao.value="";
+  inicioCotacao.value="";
+  fimCotacao.value="";
+}
+
+const lista = document.getElementById("lista");
+const selectExport = document.getElementById("cotacaoExport");
+const selectImport = document.getElementById("cotacaoImport");
+
+onSnapshot(collection(db,"cotacoes"), snapshot=>{
+  lista.innerHTML="";
+  selectExport.innerHTML="";
+  selectImport.innerHTML="";
+
+  snapshot.forEach(docSnap=>{
+    const data = docSnap.data();
+    const inicio = data.inicio?.toDate ? data.inicio.toDate().toLocaleString() : "-";
+    const fim = data.fim?.toDate ? data.fim.toDate().toLocaleString() : "-";
+    const status = data.status || "ativa";
+
+    lista.innerHTML+=`
+      <div class="card">
+        <b>${data.nome}</b><br>
+        Início: ${inicio}<br>
+        Fim: ${fim}<br>
+        Status: <span class="status">${status.toUpperCase()}</span><br><br>
+
+        <button onclick="ativar('${docSnap.id}')">Ativar</button>
+        <button onclick="desativar('${docSnap.id}')">Desativar</button>
+        <button onclick="encerrar('${docSnap.id}')">Encerrar</button>
+        <br><br>
+
+        <button onclick="copiarLink('${docSnap.id}')">Copiar Link Fornecedor</button>
+        <button onclick="excluir('${docSnap.id}')">Excluir</button>
+      </div>
+    `;
+
+    selectExport.innerHTML+=`<option value="${docSnap.id}">${data.nome}</option>`;
+    selectImport.innerHTML+=`<option value="${docSnap.id}">${data.nome}</option>`;
+  });
+});
+
+window.ativar = async id => await updateDoc(doc(db,"cotacoes",id),{ status:"ativa" });
+window.desativar = async id => await updateDoc(doc(db,"cotacoes",id),{ status:"desativada" });
+window.encerrar = async id => await updateDoc(doc(db,"cotacoes",id),{ status:"encerrada" });
+window.excluir = async id => await deleteDoc(doc(db,"cotacoes",id));
+
+window.copiarLink = function(id){
+  const base = window.location.href.replace("admin.html","");
+  const link = base + "fornecedor.html?id=" + id;
+  navigator.clipboard.writeText(link);
+  alert("Link copiado:\n\n" + link);
+}
+
+/* ================= EXPORTAR EXCEL ================= */
+
 window.exportarRelatorio = async function(){
 
   const cotacaoId = selectExport.value;
-  if(!cotacaoId){ alert("Selecione a cotação"); return; }
+  if(!cotacaoId) return alert("Selecione a cotação");
 
   const produtosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
-
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF("p","mm","a4");
-
-  let y = 25;
-
-  pdf.setFontSize(16);
-  pdf.text("SÃO RAIMUNDO SUPERMERCADO",105,15,{align:"center"});
-  pdf.setFontSize(12);
-  pdf.text("RELATÓRIO FINAL DE COTAÇÃO",105,22,{align:"center"});
-
-  pdf.setFontSize(10);
-  pdf.text("Data: "+new Date().toLocaleString(),14,y); y+=8;
-
-  let totalFornecedor = {};
-  let totalEconomizado = 0;
+  let relatorio=[];
 
   for(const produtoDoc of produtosSnap.docs){
-
-    if(y>270){ pdf.addPage(); y=20; }
 
     const produto = produtoDoc.data();
     const precosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos",produtoDoc.id,"precos"));
 
-    let ranking = [];
+    let menor=null;
+    let vencedor="-";
 
     precosSnap.forEach(p=>{
-      ranking.push({
-        fornecedor:p.data().fornecedor,
-        telefone:p.data().telefone || "",
-        valor:parseFloat(p.data().preco)
-      });
-    });
-
-    if(ranking.length===0){
-      pdf.text(produto.nome+" - SEM PREÇO",14,y);
-      y+=6;
-      continue;
-    }
-
-    ranking.sort((a,b)=>a.valor-b.valor);
-
-    const menor = ranking[0].valor;
-    const maior = ranking[ranking.length-1].valor;
-    totalEconomizado += (maior-menor);
-
-    pdf.text("Produto: "+produto.nome,14,y);
-    y+=6;
-
-    ranking.slice(0,3).forEach((r,i)=>{
-      pdf.text(`${i+1}º Lugar: ${r.fornecedor} | Tel: ${r.telefone} | R$ ${r.valor.toFixed(2)}`,18,y);
-      y+=6;
-
-      if(i===0){
-        totalFornecedor[r.fornecedor]=(totalFornecedor[r.fornecedor]||0)+r.valor;
+      const valor=parseFloat(p.data().preco);
+      if(menor===null || valor<menor){
+        menor=valor;
+        vencedor=p.data().fornecedor;
       }
     });
 
-    y+=4;
+    relatorio.push({
+      Produto: produto.nome,
+      Quantidade: produto.quantidade,
+      Unidade: produto.unidade,
+      "Menor Preço": menor ?? "Sem lance",
+      Fornecedor: vencedor
+    });
   }
 
-  pdf.addPage();
-  y=20;
+  const ws = XLSX.utils.json_to_sheet(relatorio);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Relatório Final");
+  XLSX.writeFile(wb, "Relatorio_Final.xlsx");
+}
 
-  pdf.setFontSize(12);
-  pdf.text("TOTAL POR FORNECEDOR",14,y);
-  y+=8;
+/* ================= EXPORTAR PDF ================= */
 
-  for(const f in totalFornecedor){
-    pdf.text(`${f} - R$ ${totalFornecedor[f].toFixed(2)}`,14,y);
-    y+=6;
+window.exportarPDF = async function(){
+
+  const cotacaoId = selectExport.value;
+  if(!cotacaoId) return alert("Selecione a cotação");
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF("p","mm","a4");
+
+  let y = 20;
+
+  pdf.setFontSize(14);
+  pdf.text("RELATÓRIO FINAL DE COTAÇÃO", 105, y, {align:"center"});
+  y += 10;
+
+  const produtosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
+
+  for(const produtoDoc of produtosSnap.docs){
+
+    const produto = produtoDoc.data();
+    const precosSnap = await getDocs(collection(db,"cotacoes",cotacaoId,"produtos",produtoDoc.id,"precos"));
+
+    let menor=null;
+    let vencedor="-";
+
+    precosSnap.forEach(p=>{
+      const valor=parseFloat(p.data().preco);
+      if(menor===null || valor<menor){
+        menor=valor;
+        vencedor=p.data().fornecedor;
+      }
+    });
+
+    let texto = `Produto: ${produto.nome} | Menor: ${menor ?? "Sem lance"} | Fornecedor: ${vencedor}`;
+
+    pdf.setFontSize(10);
+    pdf.text(texto, 10, y);
+    y += 6;
+
+    if(y > 280){
+      pdf.addPage();
+      y = 20;
+    }
   }
 
-  y+=8;
-  pdf.text("TOTAL ECONOMIZADO: R$ "+totalEconomizado.toFixed(2),14,y);
-
-  pdf.save("Relatorio_Cotacao_"+cotacaoId+".pdf");
+  pdf.save("Relatorio_Final.pdf");
 }
 
 </script>
-
 </body>
 </html>
