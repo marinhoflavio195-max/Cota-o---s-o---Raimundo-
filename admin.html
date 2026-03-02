@@ -16,12 +16,11 @@ header img{width:180px;margin-bottom:10px;}
 input,button,select{padding:10px;margin:5px;border-radius:8px;border:none;}
 button{background:#ff0000;color:white;cursor:pointer;}
 button:hover{background:#cc0000;}
-.card{background:white;color:black;padding:15px;margin:10px auto;border-radius:10px;max-width:600px;}
+.card{background:white;color:black;padding:15px;margin:10px auto;border-radius:10px;max-width:500px;}
 .status{font-weight:bold;}
-hr{margin:30px 0;border:1px solid #fff;}
+hr{margin:30px 0;}
 </style>
 </head>
-
 <body>
 
 <header>
@@ -55,23 +54,21 @@ hr{margin:30px 0;border:1px solid #fff;}
 <hr>
 
 <h2>Importar Produtos via Excel</h2>
-<select id="cotacaoImport"></select><br>
+<select id="cotacaoSelect"></select><br>
 <input type="file" id="arquivoExcel" accept=".xlsx,.xls"><br>
 <button onclick="importarExcel()">Importar Produtos</button>
+<button onclick="removerDuplicados()">Remover Produtos Duplicados</button>
 
 <hr>
 
 <h2>Produtos da Cotação</h2>
-<select id="cotacaoProdutos" onchange="carregarProdutos()"></select><br>
-<input type="text" id="filtroProduto" placeholder="Filtrar produto..." onkeyup="filtrarProdutos()"><br>
 <div id="totalProdutos"></div>
-<div id="listaProdutos"></div>
+<div id="produtosLista"></div>
 
 <hr>
 
 <h2>Exportar Relatório</h2>
 <select id="cotacaoExport"></select><br>
-<button onclick="exportarExcel()">Exportar Excel</button>
 <button onclick="exportarPDF()">Gerar PDF Profissional</button>
 
 </div>
@@ -81,33 +78,37 @@ hr{margin:30px 0;border:1px solid #fff;}
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-getFirestore,
-collection,
-addDoc,
-deleteDoc,
-doc,
-onSnapshot,
-getDocs,
-updateDoc
+getFirestore, collection, addDoc, deleteDoc,
+doc, onSnapshot, getDocs, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-const firebaseConfig={
+const firebaseConfig = {
 apiKey:"SUA_API_KEY",
 authDomain:"cotacao-sao-raimundo-oficial.firebaseapp.com",
-projectId:"cotacao-sao-raimundo-oficial"
+projectId:"cotacao-sao-raimundo-oficial",
+storageBucket:"cotacao-sao-raimundo-oficial.firebasestorage.app",
+messagingSenderId:"999255626219",
+appId:"1:999255626219:web:653adf6dedde30237fc9ae"
 };
 
-const app=initializeApp(firebaseConfig);
-const db=getFirestore(app);
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-window.entrar=function(){
-if(senha.value==="1234"){
+const lista = document.getElementById("lista");
+const cotacaoSelect = document.getElementById("cotacaoSelect");
+const cotacaoExport = document.getElementById("cotacaoExport");
+const produtosLista = document.getElementById("produtosLista");
+const totalProdutos = document.getElementById("totalProdutos");
+
+window.entrar = function(){
+if(document.getElementById("senha").value==="1234"){
 login.style.display="none";
 painel.style.display="block";
-}else alert("Senha incorreta!");
+}
+else alert("Senha incorreta!");
 }
 
-window.criarCotacao=async function(){
+window.criarCotacao = async function(){
 if(!nomeCotacao.value||!inicioCotacao.value||!fimCotacao.value)
 return alert("Preencha todos os campos");
 
@@ -120,21 +121,12 @@ dataCriacao:new Date()
 });
 
 alert("Cotação criada!");
-nomeCotacao.value="";
-inicioCotacao.value="";
-fimCotacao.value="";
 }
-
-const lista=document.getElementById("lista");
-const selectImport=document.getElementById("cotacaoImport");
-const selectExport=document.getElementById("cotacaoExport");
-const selectProdutos=document.getElementById("cotacaoProdutos");
 
 onSnapshot(collection(db,"cotacoes"),snap=>{
 lista.innerHTML="";
-selectImport.innerHTML="";
-selectExport.innerHTML="";
-selectProdutos.innerHTML="";
+cotacaoSelect.innerHTML="";
+cotacaoExport.innerHTML="";
 
 snap.forEach(docSnap=>{
 const data=docSnap.data();
@@ -146,15 +138,16 @@ Status: <span class="status">${data.status}</span><br><br>
 <button onclick="ativar('${docSnap.id}')">Ativar</button>
 <button onclick="desativar('${docSnap.id}')">Desativar</button>
 <button onclick="encerrar('${docSnap.id}')">Encerrar</button>
-<button onclick="excluir('${docSnap.id}')">Excluir</button>
 <br><br>
-<button onclick="copiarLink('${docSnap.id}')">🔗 Copiar Link</button>
+<button onclick="copiarLink('${docSnap.id}')">Copiar Link</button>
+<button onclick="excluir('${docSnap.id}')">Excluir</button>
 </div>`;
 
-selectImport.innerHTML+=`<option value="${docSnap.id}">${data.nome}</option>`;
-selectExport.innerHTML+=`<option value="${docSnap.id}">${data.nome}</option>`;
-selectProdutos.innerHTML+=`<option value="${docSnap.id}">${data.nome}</option>`;
+cotacaoSelect.innerHTML+=`<option value="${docSnap.id}">${data.nome}</option>`;
+cotacaoExport.innerHTML+=`<option value="${docSnap.id}">${data.nome}</option>`;
 });
+
+carregarProdutos();
 });
 
 window.ativar=id=>updateDoc(doc(db,"cotacoes",id),{status:"ativa"});
@@ -169,91 +162,110 @@ navigator.clipboard.writeText(link);
 alert("Link copiado:\n"+link);
 }
 
-/* IMPORTAR EXCEL */
+/* CARREGAR PRODUTOS */
+async function carregarProdutos(){
+if(!cotacaoSelect.value) return;
+
+const snap = await getDocs(collection(db,"cotacoes",cotacaoSelect.value,"produtos"));
+produtosLista.innerHTML="";
+totalProdutos.innerHTML="Total: "+snap.size+" produtos";
+
+snap.forEach(p=>{
+const data=p.data();
+produtosLista.innerHTML+=`
+<div class="card">
+<b>${data.nome}</b><br>
+Qtd: ${data.quantidade||"-"} ${data.unidade||""}
+<br><br>
+<button onclick="excluirProduto('${p.id}')">Excluir</button>
+</div>`;
+});
+}
+
+window.excluirProduto=async function(id){
+await deleteDoc(doc(db,"cotacoes",cotacaoSelect.value,"produtos",id));
+carregarProdutos();
+}
+
+/* IMPORTAR SEM DUPLICAR */
 window.importarExcel=async function(){
-if(!selectImport.value)return alert("Selecione cotação");
+if(!cotacaoSelect.value)return alert("Selecione cotação");
 const file=document.getElementById("arquivoExcel").files[0];
 if(!file)return alert("Selecione arquivo");
 
 const reader=new FileReader();
 reader.onload=async function(e){
+
 const data=new Uint8Array(e.target.result);
 const workbook=XLSX.read(data,{type:"array"});
 const sheet=workbook.Sheets[workbook.SheetNames[0]];
 const json=XLSX.utils.sheet_to_json(sheet);
 
+const produtosRef=collection(db,"cotacoes",cotacaoSelect.value,"produtos");
+const existentesSnap=await getDocs(produtosRef);
+
+let nomes=[];
+existentesSnap.forEach(d=>nomes.push(d.data().nome.toLowerCase()));
+
+let novos=0;
+
 for(const item of json){
-await addDoc(collection(db,"cotacoes",selectImport.value,"produtos"),{
-nome:item.nome||item.Nome,
+const nome=(item.nome||item.Nome||"").trim();
+if(!nome) continue;
+if(nomes.includes(nome.toLowerCase())) continue;
+
+await addDoc(produtosRef,{
+nome,
 quantidade:item.quantidade||item.Quantidade||"",
 unidade:item.unidade||item.Unidade||""
 });
+
+nomes.push(nome.toLowerCase());
+novos++;
 }
-alert("Produtos importados!");
+
+alert("Importação concluída! Novos: "+novos);
 carregarProdutos();
 };
+
 reader.readAsArrayBuffer(file);
 }
 
-/* CARREGAR PRODUTOS */
-window.carregarProdutos=async function(){
-listaProdutos.innerHTML="";
-if(!selectProdutos.value)return;
+/* REMOVER DUPLICADOS */
+window.removerDuplicados=async function(){
+if(!cotacaoSelect.value)return;
 
-const snap=await getDocs(collection(db,"cotacoes",selectProdutos.value,"produtos"));
-totalProdutos.innerHTML="Total: "+snap.size+" produtos";
+const snap=await getDocs(collection(db,"cotacoes",cotacaoSelect.value,"produtos"));
+let mapa={};
+let removidos=0;
 
-snap.forEach(docSnap=>{
-const p=docSnap.data();
-listaProdutos.innerHTML+=`
-<div class="card produto">
-<b>${p.nome}</b><br>
-Qtd: ${p.quantidade} ${p.unidade}<br><br>
-<button onclick="editarProduto('${docSnap.id}')">Editar</button>
-<button onclick="excluirProduto('${docSnap.id}')">Excluir</button>
-</div>`;
-});
+for(const p of snap.docs){
+const nome=p.data().nome.toLowerCase();
+if(mapa[nome]){
+await deleteDoc(doc(db,"cotacoes",cotacaoSelect.value,"produtos",p.id));
+removidos++;
+}else{
+mapa[nome]=true;
+}
 }
 
-window.filtrarProdutos=function(){
-const filtro=filtroProduto.value.toLowerCase();
-document.querySelectorAll(".produto").forEach(p=>{
-p.style.display=p.innerText.toLowerCase().includes(filtro)?"block":"none";
-});
-}
-
-window.excluirProduto=async function(id){
-await deleteDoc(doc(db,"cotacoes",selectProdutos.value,"produtos",id));
+alert("Duplicados removidos: "+removidos);
 carregarProdutos();
 }
 
-window.editarProduto=async function(id){
-const novoNome=prompt("Novo nome:");
-if(!novoNome)return;
-await updateDoc(doc(db,"cotacoes",selectProdutos.value,"produtos",id),{nome:novoNome});
-carregarProdutos();
-}
-
-/* EXPORTAR PDF PROFISSIONAL */
+/* PDF PROFISSIONAL */
 window.exportarPDF=async function(){
 const {jsPDF}=window.jspdf;
-if(!selectExport.value)return alert("Selecione cotação");
+if(!cotacaoExport.value)return alert("Selecione cotação");
 
-const cotacaoId=selectExport.value;
+const cotacaoId=cotacaoExport.value;
 const produtosSnap=await getDocs(collection(db,"cotacoes",cotacaoId,"produtos"));
-
 const pdf=new jsPDF("p","mm","a4");
 let y=20;
 let totalEconomizado=0;
-let totalFornecedor={};
 
 pdf.setFontSize(16);
 pdf.text("RELATÓRIO FINAL DE COTAÇÃO",105,y,{align:"center"});
-y+=8;
-pdf.setFontSize(10);
-pdf.text("Data/Hora: "+new Date().toLocaleString(),14,y);
-y+=6;
-pdf.text("Cotação: "+cotacaoId,14,y);
 y+=10;
 
 for(const produtoDoc of produtosSnap.docs){
@@ -269,41 +281,37 @@ valor:parseFloat(p.data().preco)
 });
 });
 
-pdf.text("Produto: "+produto.nome,14,y); y+=6;
-
-if(ranking.length===0){
-pdf.text("SEM PREÇO",18,y); y+=8;
-continue;
-}
-
 ranking.sort((a,b)=>a.valor-b.valor);
 
+pdf.text("Produto: "+produto.nome,14,y);
+y+=6;
+
+if(ranking.length>0){
 const menor=ranking[0];
+pdf.text("1º: "+menor.fornecedor+" | "+menor.telefone+" | R$ "+menor.valor.toFixed(2),18,y);
+y+=6;
+
+if(ranking[1]){
 const segundo=ranking[1];
+pdf.text("2º: "+segundo.fornecedor+" | "+segundo.telefone+" | R$ "+segundo.valor.toFixed(2),18,y);
+y+=6;
+}
+
 const maior=ranking[ranking.length-1];
-
 totalEconomizado+=maior.valor-menor.valor;
-totalFornecedor[menor.fornecedor]=(totalFornecedor[menor.fornecedor]||0)+menor.valor;
-
-pdf.text("1º: "+menor.fornecedor+" | "+menor.telefone+" | R$ "+menor.valor.toFixed(2),18,y); y+=6;
-if(segundo){
-pdf.text("2º: "+segundo.fornecedor+" | "+segundo.telefone+" | R$ "+segundo.valor.toFixed(2),18,y); y+=6;
+}else{
+pdf.text("SEM PREÇO",18,y);
+y+=6;
 }
 
 y+=4;
 if(y>270){pdf.addPage();y=20;}
 }
 
-pdf.addPage(); y=20;
-pdf.text("TOTAL POR FORNECEDOR",14,y); y+=8;
-for(const f in totalFornecedor){
-pdf.text(f+" - R$ "+totalFornecedor[f].toFixed(2),14,y);
-y+=6;
-}
-y+=6;
-pdf.text("TOTAL ECONOMIZADO: R$ "+totalEconomizado.toFixed(2),14,y);
+pdf.addPage();
+pdf.text("TOTAL ECONOMIZADO: R$ "+totalEconomizado.toFixed(2),14,20);
 
-pdf.save("Relatorio_Cotacao.pdf");
+pdf.save("Relatorio_Final.pdf");
 }
 
 </script>
